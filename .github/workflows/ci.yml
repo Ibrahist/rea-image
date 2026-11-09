@@ -44,8 +44,11 @@ jobs:
           python -m rea_image.cli --help
 
       - name: Test CLI eval and batch parallel analyze
+        # Gate CI on benchmark accuracy: set to a value just under the measured overall accuracy
+        # (currently 90.9%). When updating or adding benchmark fixtures, re-run `rea-image eval`
+        # and update --min-accuracy to match the new baseline.
         run: |
-          rea-image eval eval/benchmark_data/dataset.json --results "${{ runner.temp }}/r.md" --min-accuracy 70.0
+          rea-image eval eval/benchmark_data/dataset.json --results "${{ runner.temp }}/r.md" --min-accuracy 90.0
           rea-image analyze eval/benchmark_data/images --jobs 2 --out "${{ runner.temp }}/o"
 
   test-ocr:
