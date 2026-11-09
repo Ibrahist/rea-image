@@ -1,7 +1,9 @@
 """Full analysis pipeline orchestrator connecting all stages M1-M8."""
 
 import hashlib
+import inspect
 import json
+import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -45,6 +47,63 @@ from rea_image.report.html_generator import generate_report_html
 from rea_image.report.assets_exporter import export_assets_bundle
 
 
+def compute_detectors_fingerprint(detectors: list) -> str:
+    """Compute SHA-256 fingerprint from detector class names, source code, run methods, and source files."""
+    parts = []
+    for d in sorted(detectors, key=lambda x: type(x).__name__):
+        cls = d.__class__
+        parts.append(cls.__name__)
+        try:
+            parts.append(inspect.getsource(cls))
+        except Exception:
+            pass
+        try:
+            parts.append(inspect.getsource(d.run))
+        except Exception:
+            pass
+        try:
+            code = getattr(d.run, "__code__", None)
+            if code:
+                parts.append(str(code.co_code))
+                parts.append(str(code.co_consts))
+        except Exception:
+            pass
+        try:
+            file_path = inspect.getsourcefile(cls)
+            if file_path and os.path.exists(file_path):
+                with open(file_path, "rb") as f:
+                    parts.append(hashlib.sha256(f.read()).hexdigest())
+        except Exception:
+            pass
+    return hashlib.sha256("".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def compute_craft_fingerprint() -> str:
+    """Compute SHA-256 fingerprint from craft-analysis classes, functions, and source files."""
+    craft_targets = [
+        CameraCraftEstimator,
+        LightingClassifier,
+        extract_dominant_palette,
+        analyze_color_grade,
+        analyze_composition,
+    ]
+    parts = []
+    for target in craft_targets:
+        parts.append(getattr(target, "__name__", str(target)))
+        try:
+            parts.append(inspect.getsource(target))
+        except Exception:
+            pass
+        try:
+            file_path = inspect.getsourcefile(target)
+            if file_path and os.path.exists(file_path):
+                with open(file_path, "rb") as f:
+                    parts.append(hashlib.sha256(f.read()).hexdigest())
+        except Exception:
+            pass
+    return hashlib.sha256("".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
 def run_analysis_pipeline(
     image_path: Path,
     out_dir: Optional[Path] = None,
@@ -76,8 +135,7 @@ def run_analysis_pipeline(
     # Stage 3: Evidence Collection
     skipped_detectors: List[str] = []
     detectors = get_active_detectors(disabled=disabled_detectors, skipped_detectors=skipped_detectors)
-    active_det_names = sorted(type(d).__name__ for d in detectors)
-    det_fingerprint = hashlib.sha256(json.dumps(active_det_names, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    det_fingerprint = compute_detectors_fingerprint(detectors)
 
     ev_meta = json.dumps({"version": __version__, "detectors": det_fingerprint, "seg": seg_fingerprint}, sort_keys=True)
     cache_ev_key = f"evidence_{hashlib.sha256(ev_meta.encode('utf-8')).hexdigest()[:16]}"
@@ -132,8 +190,9 @@ def run_analysis_pipeline(
                     if not no_cache:
                         default_cache.set(sha256, vlm_cache_tag, [it.model_dump() for it in vlm_items])
 
-    # Stage 3.D/E: Craft & Typography (fingerprinted by version and segmentation)
-    craft_meta = json.dumps({"version": __version__, "seg": seg_fingerprint}, sort_keys=True)
+    # Stage 3.D/E: Craft & Typography (fingerprinted by version, craft source code, and segmentation)
+    craft_fingerprint = compute_craft_fingerprint()
+    craft_meta = json.dumps({"version": __version__, "craft": craft_fingerprint, "seg": seg_fingerprint}, sort_keys=True)
     craft_cache_tag = f"craft_{hashlib.sha256(craft_meta.encode('utf-8')).hexdigest()[:16]}"
     cached_craft = None if no_cache else default_cache.get(sha256, craft_cache_tag)
     if cached_craft is not None:

@@ -126,3 +126,44 @@ def test_cache_offline_and_vlm_isolation(tmp_path: Path, monkeypatch):
     all_ev_names = [ev.name for ev in rep_online.regions[0].evidence]
     assert "vlm_pseudo_text_detected" in all_ev_names
 
+
+def test_cache_detector_modification_invalidation(tmp_path: Path, monkeypatch):
+    """Verify that monkeypatching a detector to change its code/output invalidates cache without a version bump."""
+    from rea_image.report.orchestrator import run_analysis_pipeline
+    from rea_image.evidence.forensics_noise import ForensicsNoiseDetector
+    from rea_image.evidence.base import make_evidence
+    from rea_image.schemas import ProductionMethod
+
+    img_path = tmp_path / "patch_sample.png"
+    img = Image.new("RGB", (100, 100), color=(100, 150, 200))
+    img.save(img_path)
+
+    # 1. First run with unmodified detector code
+    rep1 = run_analysis_pipeline(img_path, out_dir=tmp_path / "run1")
+    assert rep1 is not None
+    names1 = [ev.name for ev in rep1.regions[0].evidence]
+    assert "custom_monkeypatched_signal" not in names1
+
+    # 2. Monkeypatch ForensicsNoiseDetector.run so its source code changes
+    def custom_noise_run(self, ingest_res, regions=None):
+        return [
+            make_evidence(
+                name="custom_monkeypatched_signal",
+                value={"custom": True},
+                direction=ProductionMethod.AI_GENERATED.value,
+                strength=0.95,
+                explanation="Monkeypatched test signal",
+            )
+        ]
+
+    monkeypatch.setattr(ForensicsNoiseDetector, "run", custom_noise_run)
+
+    # 3. Second run with same image and cache dir
+    rep2 = run_analysis_pipeline(img_path, out_dir=tmp_path / "run2")
+    assert rep2 is not None
+
+    # Cache must have invalidated due to detector source change, delivering the new signal
+    names2 = [ev.name for ev in rep2.regions[0].evidence]
+    assert "custom_monkeypatched_signal" in names2
+
+

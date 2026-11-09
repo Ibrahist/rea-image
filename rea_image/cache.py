@@ -1,4 +1,4 @@
-"""Disk caching for expensive pipeline steps by image SHA-256 hash."""
+"""Disk caching for expensive pipeline steps by image SHA-256 hash and source-fingerprinted step names."""
 
 import json
 import logging
