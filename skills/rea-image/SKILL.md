@@ -12,6 +12,12 @@ Use this skill whenever you need to break down an image, inspect provenance or a
 ## When to Use This Skill
 - The user provides an image or folder and asks: "How was this made?", "Is this AI or a photo?", "Extract the prompt/lighting for this image", or "Help me recreate this".
 - The user wants a reverse prompt, photographic lighting diagram, SVG scaffold, or Blender scene based on an existing visual.
+- **Graphic Design & Vectorization**: Recreating posters, banners, and logos into editable SVG/HTML scaffolds.
+- **Editorial & Studio Photography**: Reverse-engineering lighting setups (Rembrandt, Butterfly, Softbox), camera gear, and LUT-style grading.
+- **Frontend & UI Engineering**: Converting web or app screenshots into responsive HTML/CSS structures and design tokens.
+- **Game Art & 3D**: Deconstructing renders and bootstrapping Blender scenes (`starter_scene.py`).
+- **Trust & Verification**: Analyzing C2PA Content Credentials, EXIF hardware parameters, and JPEG/noise forensic signatures for journalism or marketplace moderation.
+- **Campaign Consistency**: Verifying palette and lighting coherence across social carousels or ad series.
 
 ---
 
