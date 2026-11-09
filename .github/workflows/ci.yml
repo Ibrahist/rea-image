@@ -38,3 +38,4 @@ jobs:
         run: |
           rea-image --help
           python -m rea_image.cli --help
+
