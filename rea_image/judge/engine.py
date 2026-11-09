@@ -122,6 +122,14 @@ class JudgmentEngine:
         # Confidence level
         confidence = compute_confidence_label(winner_prob, top_supporting)
 
+        # If conflicts exist and no hard cryptographic proof overrides it, downgrade confidence
+        has_hard_proof = any(ev.name in ("c2pa_assertion", "ai_generator_metadata") for ev in top_supporting)
+        if (review_items or contradictions) and not has_hard_proof:
+            if confidence in (ConfidenceLevel.HIGH.value, ConfidenceLevel.MEDIUM_HIGH.value):
+                confidence = ConfidenceLevel.MEDIUM.value
+            elif confidence == ConfidenceLevel.MEDIUM.value:
+                confidence = ConfidenceLevel.MEDIUM_LOW.value
+
         region_analysis = RegionAnalysis(
             id=region_id,
             label=label,

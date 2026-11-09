@@ -15,23 +15,51 @@ class ConflictDetector:
         contradictions: List[str] = []
         review_items: List[NeedsReviewItem] = []
 
-        has_camera_exif = any(ev.name == "camera_exif" for ev in evidence_list)
-        has_ai_metadata = any(ev.name == "ai_generator_metadata" for ev in evidence_list)
-        has_ai_forensics = any(ev.name in ("spectral_peaks_upscaler", "ai_style_plastic_sheen") for ev in evidence_list)
-        has_flat_graphic = any(ev.name == "flat_color_runs" for ev in evidence_list)
+        # 1. Real photo signals (hardware EXIF or physical optical/sensor forensics)
+        photo_signals = [
+            ev for ev in evidence_list
+            if ev.direction == "real photograph"
+            and ev.name in ("camera_exif", "jpeg_grid_aligned", "natural_frequency_falloff", "sensor_poisson_noise", "continuous_natural_gradients")
+            and ev.strength >= 0.4
+        ]
+        has_camera_exif = any(ev.name == "camera_exif" for ev in photo_signals)
+        has_photo_signals = len(photo_signals) > 0
+
+        # 2. AI synthetic signals
+        ai_signals = [
+            ev for ev in evidence_list
+            if ev.direction == "AI-generated"
+            and ev.name in ("ai_generator_metadata", "spectral_peaks_upscaler", "ai_style_plastic_sheen")
+            and ev.strength >= 0.3
+        ]
+        has_ai_signals = len(ai_signals) > 0
+
+        # 3. Graphic / vector signals
+        graphic_signals = [
+            ev for ev in evidence_list
+            if ev.direction == "vector or graphic design"
+            and ev.name in ("flat_color_runs", "ela_minimal_error")
+            and ev.strength >= 0.3
+        ]
+        has_graphic_signals = len(graphic_signals) > 0
+
+        # 4. Splicing / noise composite signals
         has_noise_composite = any(ev.name in ("noise_inconsistency_composite", "jpeg_grid_misalignment") for ev in evidence_list)
 
-        # Conflict 1: Camera EXIF present, but AI metadata or AI forensics detected
-        if has_camera_exif and (has_ai_metadata or has_ai_forensics):
-            msg = "Conflict: Camera hardware EXIF is present, but AI synthetic indicators were also detected."
+        # Conflict 1: Camera EXIF or optical photo signals coexist with AI synthetic indicators
+        if has_photo_signals and has_ai_signals:
+            photo_names = ", ".join(ev.name for ev in photo_signals)
+            ai_names = ", ".join(ev.name for ev in ai_signals)
+            msg = f"Conflict: Real photograph signals ({photo_names}) coexist with AI synthetic indicators ({ai_names})."
             contradictions.append(msg)
+            reason_str = "EXIF vs. Synthetic artifacts mismatch" if has_camera_exif else "Optical photo vs. AI synthetic conflict"
             review_items.append(
                 NeedsReviewItem(
                     region_id=region_id,
-                    reason="EXIF vs. Synthetic artifacts mismatch",
+                    reason=reason_str,
                     question_for_agent=(
-                        "Inspect image boundaries, fine details (fingers, pupils, text), and noise texture. "
-                        "Determine if camera EXIF is authentic with AI post-processing/inpainting, or if EXIF was spoofed/copied onto an AI generation."
+                        f"Inspect image details and noise texture for agent review: optical signals ({photo_names}) contradict AI indicators ({ai_names}). "
+                        "Determine if this is an authentic photograph affected by compression/resizing, or generative AI with simulated photographic properties."
                     ),
                 )
             )
@@ -51,16 +79,19 @@ class ConflictDetector:
                 )
             )
 
-        # Conflict 3: Real photo indicators mixed with pure flat vector runs
-        if has_camera_exif and has_flat_graphic:
-            msg = "Conflict: Photographic camera capture combined with exact vector graphic flat runs."
+        # Conflict 3: Real photo indicators mixed with flat vector runs
+        if has_photo_signals and has_graphic_signals:
+            photo_names = ", ".join(ev.name for ev in photo_signals)
+            graphic_names = ", ".join(ev.name for ev in graphic_signals)
+            msg = f"Conflict: Photographic signals ({photo_names}) coexist with vector graphic signals ({graphic_names})."
             contradictions.append(msg)
             review_items.append(
                 NeedsReviewItem(
                     region_id=region_id,
-                    reason="Mixed photo and graphic layers",
+                    reason="Mixed photo and graphic layers" if has_camera_exif else "Photo vs. Vector graphic conflict",
                     question_for_agent=(
-                        "Verify whether text banners, logos, or UI badges were digitally overlaid onto a real photograph."
+                        f"Photographic signals ({photo_names}) coexist with graphic signals ({graphic_names}). "
+                        "Verify whether text banners, logos, or UI elements were digitally overlaid onto a photograph, or if recompression caused false flat runs."
                     ),
                 )
             )

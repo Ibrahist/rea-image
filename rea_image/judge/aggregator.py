@@ -49,15 +49,23 @@ class VerdictAggregator:
             style_info = estimate_ai_model_family(global_evidence, width, height, color_grade)
             ai_style = f"{style_info['family']}; "
 
-        # Summary line
-        if has_secondary:
+        # Check if contradictions or conflict items exist across regions
+        has_conflicts = any(r.contradictions for r in regions)
+        conf_label = regions[0].confidence if regions else "medium"
+        if has_conflicts and conf_label in ("high", "medium-high"):
+            conf_label = "medium"
+
+        # Summary line - never output confident 100% when signals conflict
+        if has_conflicts and dominant_pct >= 95.0:
+            summary = f"{dominant_method} ~{dominant_pct:.0f}% (conflicting evidence); {ai_style}{aspect_ratio}; confidence {conf_label}"
+        elif has_secondary:
             sec_method, sec_pct = sorted_methods[1]
             summary = (
                 f"{dominant_method} {dominant_pct:.0f}% + {sec_method} {sec_pct:.0f}%; "
-                f"{ai_style}{aspect_ratio}; confidence {regions[0].confidence}"
+                f"{ai_style}{aspect_ratio}; confidence {conf_label}"
             )
         else:
-            summary = f"{dominant_method} {dominant_pct:.0f}%; {ai_style}{aspect_ratio}; confidence {regions[0].confidence}"
+            summary = f"{dominant_method} {dominant_pct:.0f}%; {ai_style}{aspect_ratio}; confidence {conf_label}"
 
         # What evidence would change the verdict
         if "ai-generated" in dominant_method.lower():
@@ -80,7 +88,7 @@ class VerdictAggregator:
 
         verdict = Verdict(
             summary=summary,
-            confidence=regions[0].confidence if regions else "medium",
+            confidence=conf_label,
             method_breakdown=breakdown,
         )
 
