@@ -31,6 +31,12 @@ def test_cli_analyze_and_report_cycle(tmp_path: Path):
     assert res_report.exit_code == 0
     assert "Successfully rebuilt" in res_report.output
 
+    # 2b. rea-image explain
+    res_explain = runner.invoke(app, ["explain", str(out_dir)])
+    assert res_explain.exit_code == 0
+    assert "Evidence Ledger" in res_explain.output
+    assert "Signed Score" in res_explain.output
+
     # 3. rea-image palette
     res_palette = runner.invoke(app, ["palette", str(img_path)])
     assert res_palette.exit_code == 0
@@ -99,4 +105,37 @@ def test_cli_recreate_missing_path_does_not_crash(tmp_path: Path):
     res = runner.invoke(app, ["recreate", str(out_dir), "--dry-run"])
     assert res.exit_code == 0
     assert "SKIPPED" in res.output
+
+
+def test_cli_explain_region_filtering_and_missing(tmp_path: Path):
+    """Test explain command with specific region and invalid region."""
+    import json
+    out_dir = tmp_path / "explain_test"
+    out_dir.mkdir()
+    fake_report = {
+        "verdict": {"summary": "AI-generated 100%"},
+        "regions": [
+            {
+                "id": "region_1",
+                "label": "subject",
+                "method": "AI-generated",
+                "confidence": "high",
+                "evidence": [
+                    {"name": "ai_generator_metadata", "region": "region_1", "direction": "AI-generated", "strength": 0.9, "explanation": "Prompt metadata"}
+                ]
+            }
+        ]
+    }
+    (out_dir / "report.json").write_text(json.dumps(fake_report), encoding="utf-8")
+
+    # Specific region
+    res_ok = runner.invoke(app, ["explain", str(out_dir), "--region", "region_1"])
+    assert res_ok.exit_code == 0
+    assert "Region region_1" in res_ok.output
+    assert "+4.05" in res_ok.output or "Net Signed Support" in res_ok.output
+
+    # Missing region
+    res_err = runner.invoke(app, ["explain", str(out_dir), "--region", "region_missing"])
+    assert res_err.exit_code == 1
+    assert "Region 'region_missing' not found" in res_err.output
 

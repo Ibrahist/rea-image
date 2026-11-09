@@ -120,6 +120,94 @@ def report(
         webbrowser.open(html_path.resolve().as_uri())
 
 
+@app.command()
+def explain(
+    out_dir: Path = typer.Argument(..., help="Output directory containing report.json."),
+    region: Optional[str] = typer.Option(None, "--region", "-r", help="Region ID to explain (default: all regions)."),
+):
+    """Print the evidence ledger behind a verdict (each item, weight, signed contribution)."""
+    import json
+    from rea_image.judge.engine import DETECTOR_CATEGORY_WEIGHTS
+
+    json_path = out_dir / "report.json" if out_dir.is_dir() else out_dir
+    if not json_path.exists():
+        console.print(f"[bold red]Error:[/bold red] report.json not found in {out_dir}")
+        raise typer.Exit(code=1)
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    verdict_summary = data.get("verdict", {}).get("summary", "Unknown")
+    regions = data.get("regions", [])
+
+    if region:
+        target_regions = [r for r in regions if r.get("id") == region]
+        if not target_regions:
+            valid_ids = [r.get("id") for r in regions]
+            console.print(f"[bold red]Error:[/bold red] Region '{region}' not found. Available regions: {', '.join(valid_ids)}")
+            raise typer.Exit(code=1)
+    else:
+        target_regions = regions
+
+    console.print(Panel(
+        f"[bold cyan]rea-image Evidence Ledger & Verdict Explanation[/bold cyan]\n"
+        f"Verdict: [bold]{verdict_summary}[/bold]",
+        expand=False,
+    ))
+
+    for r in target_regions:
+        r_id = r.get("id", "unknown")
+        r_label = r.get("label", "unknown")
+        r_method = r.get("method", "unknown")
+        r_conf = r.get("confidence", "unknown")
+        r_evidence = r.get("evidence", [])
+
+        table = Table(
+            title=f"Region {r_id} ({r_label}) — Predicted: {r_method} ({r_conf})",
+            show_header=True,
+            header_style="bold magenta",
+        )
+        table.add_column("Detector / Signal", style="cyan")
+        table.add_column("Direction", style="white")
+        table.add_column("Strength", justify="right")
+        table.add_column("Weight", justify="right")
+        table.add_column("Signed Score", justify="right")
+        table.add_column("Explanation", style="white")
+
+        total_signed = 0.0
+        for ev in r_evidence:
+            name = ev.get("name", "")
+            direction = ev.get("direction", "")
+            strength = float(ev.get("strength", 0.0))
+            cat_weight = DETECTOR_CATEGORY_WEIGHTS.get(name, 1.0)
+            reg_mult = 1.5 if ev.get("region") == r_id else 1.0
+            eff_weight = cat_weight * reg_mult
+
+            if direction == r_method:
+                signed = eff_weight * strength
+                score_str = f"[green]+{signed:.2f}[/green]"
+            elif direction == "neutral":
+                signed = 0.0
+                score_str = "[dim]0.00[/dim]"
+            else:
+                signed = -(eff_weight * strength)
+                score_str = f"[red]{signed:.2f}[/red]"
+
+            total_signed += signed
+            table.add_row(
+                name,
+                direction,
+                f"{strength:.2f}",
+                f"{eff_weight:.1f}x",
+                score_str,
+                ev.get("explanation", ""),
+            )
+
+        console.print(table)
+        net_style = "green" if total_signed >= 0 else "red"
+        console.print(f"  [bold]Net Signed Support for '{r_method}':[/bold] [{net_style}]{total_signed:+.2f}[/{net_style}]\n")
+
+
 @app.command(name="apply-review")
 def apply_review(
     out_dir: Path = typer.Argument(..., help="Output directory containing report.json and review_tasks.json."),
