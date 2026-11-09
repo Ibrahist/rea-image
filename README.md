@@ -92,7 +92,18 @@ Requirements: Python 3.10+ (tested on Python 3.10, 3.11, 3.12, 3.13, 3.14).
 ```bash
 git clone https://github.com/Ibrahist/rea-image.git
 cd rea-image
+
+# Basic install
 pip install -e .
+
+# Optional extras:
+pip install -e ".[ocr]"    # Tesseract OCR text extraction & typography measurement
+pip install -e ".[heic]"   # Apple HEIC/HEIF image decoding
+pip install -e ".[avif]"   # AVIF image decoding
+pip install -e ".[vlm]"    # Optional Vision-Language Model semantic validation
+
+# Full install with all extras & dev tools
+pip install -e ".[ocr,heic,avif,vlm,dev]"
 ```
 
 ---
@@ -102,6 +113,18 @@ pip install -e .
 ```bash
 # Analyze a single image (offline by default)
 rea-image analyze /path/to/image.png --out ./rea_output
+
+# Analyze a directory in parallel with recursive scanning and machine-readable JSON output
+rea-image analyze /path/to/folder --recursive --jobs 4 --format json
+
+# Explain the evidence ledger and signed contribution behind a verdict
+rea-image explain ./rea_output [--region region_1]
+
+# List all available and pluggable evidence detectors
+rea-image detectors
+
+# Disable specific detectors during analysis
+rea-image analyze /path/to/image.png --disable frequency,noise
 
 # Analyze with Agent Review mode (exports crops and questions for review)
 rea-image analyze /path/to/image.png --agent-review
@@ -124,9 +147,11 @@ rea-image prompt /path/to/image.png
 # Run dry-run recreation simulation
 rea-image recreate ./rea_output --dry-run
 
-# Run the evaluation benchmark harness
-rea-image eval eval/benchmark_data/dataset.json
+# Run the evaluation benchmark harness (checks calibration tolerance)
+rea-image eval eval/benchmark_data/dataset.json --tolerance 20.0
 ```
+
+For complete command details and technical forensic limits, refer to [CLI Documentation](docs/cli.md) and [Technical Limitations](docs/limitations.md).
 
 ---
 
