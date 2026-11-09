@@ -155,6 +155,9 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
     )
 
     # 8. AI Generated (Held-Out, Screenshot condition)
+    # Investigation note: Resampling an AI image strips metadata chunks and alters bucket
+    # dimensions (1024/512 -> 480). Lanczos filtering smooths periodic upsampler spikes into
+    # continuous gradients and high variance, causing offline heuristics to lean toward real photograph.
     p8 = images_dir / "ai_heldout_ss.png"
     img8 = img1.resize((480, 480), Image.Resampling.LANCZOS)
     img8.save(p8, format="PNG")
@@ -251,6 +254,9 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
     )
 
     # 13. AI Generated (Held-Out, Compressed condition)
+    # Investigation note: High JPEG compression on low-entropy checkerboard patterns creates
+    # low unique color sampling that triggers flat-run/vector heuristics, conflicting with
+    # invisible watermark and resolution bucket signals.
     p13 = images_dir / "ai_heldout_comp.jpg"
     img9.save(p13, format="JPEG", quality=80)
     items.append(

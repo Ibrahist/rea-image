@@ -13,13 +13,14 @@ While `rea-image` combines hard cryptographic provenance, statistical frequency 
 
 ## 2. Heavy Platform Post-Processing and Multiple Re-Saves
 - **Multi-pass re-compression**: When an image is repeatedly saved across messaging apps (e.g. WhatsApp $\to$ Twitter $\to$ Instagram), secondary quantization matrices overwrite camera DCT fingerprints. Low ELA residuals occur naturally on re-compressed files, requiring corroboration from flat-run continuity or Poisson noise before concluding vector or graphic design.
+- **Compressed AI Images Without Metadata**: When an AI image loses generation metadata chunks via compression (e.g. `ai_heldout_comp`), high compression ratios on low-entropy or checkerboard patterns can reduce sampled unique colors and introduce quantization boundaries, occasionally clashing with invisible watermarks and leaning toward graphic design or conflicting evidence.
 - **Aggressive denoise and beauty filters**: Heavy frequency-separation skin smoothing, computational night-mode de-noising, or AI "portrait enhancement" built into smartphone cameras suppress high-frequency sensor noise ($p75 < 1.0$), which can mimic diffusion or 3D shader smoothness.
 
 ---
 
 ## 3. Screenshots and Display Resampling
 - **Sub-pixel display scaling**: Taking a screenshot on retina/HiDPI displays introduces bilinear or bicubic filtering that blurs single-pixel vector boundaries and spreads high-frequency lines across 2–4 pixels.
-- **Screenshot-of-Photo / Screenshot-of-AI**: A screenshot of an AI-generated image loses PNG chunks and metadata; the detector must rely on residual synthetic noise, prompt anomalies, or frequency artifacts.
+- **Screenshot-of-Photo / Screenshot-of-AI**: A screenshot of an AI-generated image (e.g. `ai_heldout_ss`) loses PNG chunks and metadata, and alters bucket resolutions. Resampling filters (e.g. Lanczos) blend high-frequency lattice artifacts into smooth gradients with broad variance, leading offline heuristics to detect natural gradients and residual variance and misclassify the screenshot as an optical photograph. Robust resolution of resampled screenshots requires visual semantic review (`--agent-review` or `--vlm`).
 
 ---
 
