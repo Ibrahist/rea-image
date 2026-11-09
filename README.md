@@ -39,6 +39,18 @@
 
 `rea-image` fits into practical production pipelines across creative, engineering, and investigative workflows:
 
+| Sector / Role | Use Case / Environment | Primary Deliverable |
+| :--- | :--- | :--- |
+| **Designers & Art Directors** | Moodboard deconstruction, style guides, poster vectorization | Layered prompts, color roles, `scaffold.svg` |
+| **Photographers & Studios** | Reverse-engineering lighting setups, matching client references | ASCII lighting diagram, gear list, `shoot_plan.md` |
+| **Frontend Engineers** | Turning UI screenshots into responsive mockups & design tokens | `scaffold.html`, CSS variables, font candidates |
+| **3D & Game Artists** | Reverse-engineering environment lighting and shaders | `starter_scene.py` (Blender Cycles rig & camera) |
+| **Trust, Safety & Journalism** | Image authenticity, C2PA validation, tamper/splice detection | `verdict.txt`, ELA / noise forensics, `report.json` |
+| **Marketing Teams** | Multi-slide carousel audit, brand palette & tone continuity | `consistency_summary.json` across image sets |
+| **Autonomous AI Agents** | Multi-modal coding pipelines in Claude Code, Codex, Antigravity | `skills/rea-image/SKILL.md`, CLI integration |
+
+### Practical Workflow Scenarios
+
 1. **Design & Creative Direction**:
    - **Moodboard & Reference Deconstruction**: Break client references and moodboards into concrete color roles (`background`, `accent`, `text`), lighting schemes, and composition rules.
    - **Prompt Engineering & Reverse Iteration**: Extract faithful, simplified, and style-transfer prompts from reference imagery to remix concepts in Midjourney, FLUX, or Stable Diffusion without guessing.
