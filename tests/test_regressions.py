@@ -175,3 +175,34 @@ def test_tesseract_garbage_output_filtered(monkeypatch):
     segmenter = ClassicalSegmenter()
     regions = segmenter.segment(arr)
     assert not any(r.label == "text_block" for r in regions)
+
+
+def test_composite_image_different_methods_per_region(tmp_path):
+    """Regression test for A2: A composite image with photo half and flat graphic half must evaluate per-region."""
+    h, w = 400, 400
+    arr = np.zeros((h, w, 3), dtype=np.uint8)
+    
+    # Top half: photo gradient with noise
+    y = np.linspace(100, 220, 200)[:, None]
+    x = np.linspace(50, 180, 400)[None, :]
+    arr[:200, :, 0] = y.astype(np.uint8)
+    arr[:200, :, 1] = ((y + x) / 2).astype(np.uint8)
+    arr[:200, :, 2] = (255 - y).astype(np.uint8)
+    noise = np.random.normal(0, 4, (200, 400, 3)).astype(np.float32)
+    arr[:200] = np.clip(arr[:200].astype(np.float32) + noise, 0, 255).astype(np.uint8)
+
+    # Bottom half: flat vector/graphic design
+    arr[200:, :] = [240, 30, 30]
+
+    img = Image.fromarray(arr)
+    img_path = tmp_path / "composite.png"
+    img.save(img_path)
+
+    out_dir = tmp_path / "out"
+    report = run_analysis_pipeline(img_path, out_dir, offline=True)
+
+    assert len(report.regions) >= 2
+    methods = {r.method for r in report.regions}
+    # Expected: one region photo, one region vector/graphic
+    assert ProductionMethod.GRAPHIC_DESIGN.value in methods
+    assert ProductionMethod.REAL_PHOTO.value in methods

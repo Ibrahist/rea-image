@@ -126,13 +126,29 @@ def run_analysis_pipeline(
     region_analyses = []
     all_needs_review: List[NeedsReviewItem] = []
 
+    # Compute regional evidence per segmented region
+    regional_evidence_map: Dict[str, List[EvidenceItem]] = {}
     for r in seg_regions:
+        x, y, bw, bh = r.bbox
+        crop = arr[y : y + bh, x : x + bw]
+        r_ev_list: List[EvidenceItem] = []
+        if crop.size > 0:
+            for d in detectors:
+                if hasattr(d, "run_region"):
+                    try:
+                        r_ev_list.extend(d.run_region(crop, r.id, mask=r.mask))
+                    except Exception:
+                        pass
+        regional_evidence_map[r.id] = r_ev_list
+
+    for r in seg_regions:
+        combined_evidence = list(global_evidence) + regional_evidence_map.get(r.id, [])
         reg_analysis, contradictions, review_items = judge_engine.judge_region(
             region_id=r.id,
             label=r.label,
             bbox=r.bbox,
             area_pct=r.area_pct,
-            evidence_list=list(global_evidence),  # inherit global signals + regional
+            evidence_list=combined_evidence,
         )
         reg_analysis.palette = palette[:3]
         all_needs_review.extend(review_items)

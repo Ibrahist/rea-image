@@ -76,6 +76,12 @@ class JudgmentEngine:
         evidence_list: List[EvidenceItem],
     ) -> Tuple[RegionAnalysis, List[str], list]:
         """Classify a region based on weighted evidence sum."""
+        # Filter evidence applicable to this region: global evidence + region-specific evidence
+        applicable_evidence = [
+            ev for ev in evidence_list
+            if ev.region in ("global", region_id)
+        ]
+
         # Initialize scores for all production methods
         scores: Dict[str, float] = {m.value: 0.05 for m in ProductionMethod}
 
@@ -86,8 +92,10 @@ class JudgmentEngine:
             scores[ProductionMethod.UI_SCREENSHOT.value] += 1.2
 
         # Accumulate weighted evidence
-        for ev in evidence_list:
+        for ev in applicable_evidence:
             weight = DETECTOR_CATEGORY_WEIGHTS.get(ev.name, 1.0) * ev.strength
+            if ev.region == region_id:
+                weight *= 1.5
             target_method = ev.direction
             if target_method in scores:
                 scores[target_method] += weight
@@ -101,23 +109,23 @@ class JudgmentEngine:
         winner_method, winner_prob = sorted_methods[0]
 
         # Top 3 supporting evidence items
-        supporting = [ev for ev in evidence_list if ev.direction == winner_method]
+        supporting = [ev for ev in applicable_evidence if ev.direction == winner_method]
         supporting.sort(
-            key=lambda ev: DETECTOR_CATEGORY_WEIGHTS.get(ev.name, 1.0) * ev.strength,
+            key=lambda ev: DETECTOR_CATEGORY_WEIGHTS.get(ev.name, 1.0) * ev.strength * (1.5 if ev.region == region_id else 1.0),
             reverse=True,
         )
         top_supporting = supporting[:3]
 
         # Top 1-2 contradicting evidence items
-        contradicting = [ev for ev in evidence_list if ev.direction != winner_method and ev.direction != "neutral"]
+        contradicting = [ev for ev in applicable_evidence if ev.direction != winner_method and ev.direction != "neutral"]
         contradicting.sort(
-            key=lambda ev: DETECTOR_CATEGORY_WEIGHTS.get(ev.name, 1.0) * ev.strength,
+            key=lambda ev: DETECTOR_CATEGORY_WEIGHTS.get(ev.name, 1.0) * ev.strength * (1.5 if ev.region == region_id else 1.0),
             reverse=True,
         )
         top_contradicting = contradicting[:2]
 
         # Check contradictions and agent review needs
-        contradictions, review_items = self.conflict_detector.find_conflicts(evidence_list, region_id=region_id)
+        contradictions, review_items = self.conflict_detector.find_conflicts(applicable_evidence, region_id=region_id)
 
         # Confidence level
         confidence = compute_confidence_label(winner_prob, top_supporting)
@@ -137,8 +145,9 @@ class JudgmentEngine:
             area_pct=area_pct,
             method=winner_method,
             confidence=confidence,
-            evidence=evidence_list,
+            evidence=applicable_evidence,
             contradictions=contradictions,
+            top_contradicting=top_contradicting,
         )
 
         return region_analysis, contradictions, review_items

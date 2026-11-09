@@ -101,3 +101,37 @@ class VisualChecksDetector(BaseDetector):
         except Exception:
             pass
         return {"detected": False}
+
+    def run_region(self, crop: np.ndarray, region_id: str, mask: Optional[np.ndarray] = None) -> List[EvidenceItem]:
+        items: List[EvidenceItem] = []
+        h, w, _ = crop.shape
+        if h < 32 or w < 32:
+            return items
+
+        plastic_sheen = self._check_plastic_sheen(crop)
+        if plastic_sheen.get("detected"):
+            items.append(
+                make_evidence(
+                    name="ai_style_plastic_sheen",
+                    value=plastic_sheen,
+                    direction=ProductionMethod.AI_GENERATED.value,
+                    strength=0.72,
+                    explanation=f"Region {region_id} exhibits over-smooth plastic sheen texture typical of AI generation.",
+                    region=region_id,
+                )
+            )
+
+        render_tells = self._check_render_shaders(crop)
+        if render_tells.get("detected"):
+            items.append(
+                make_evidence(
+                    name="3d_shader_characteristics",
+                    value=render_tells,
+                    direction=ProductionMethod.RENDER_3D.value,
+                    strength=0.75,
+                    explanation=f"Region {region_id} shows clean geometric edge falloff and PBR shader gradients.",
+                    region=region_id,
+                )
+            )
+
+        return items

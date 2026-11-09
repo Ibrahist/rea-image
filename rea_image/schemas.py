@@ -136,6 +136,7 @@ class RegionAnalysis(BaseModel):
     confidence: str
     evidence: List[EvidenceItem] = Field(default_factory=list)
     contradictions: List[str] = Field(default_factory=list)
+    top_contradicting: List[EvidenceItem] = Field(default_factory=list)
     typography: Dict[str, Any] = Field(default_factory=dict)
     palette: List[PaletteColor] = Field(default_factory=list)
     composition: Dict[str, Any] = Field(default_factory=dict)

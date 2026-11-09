@@ -161,3 +161,26 @@ class ForensicsJpegDetector(BaseDetector):
         except Exception:
             pass
         return {"grid_detected": False}
+
+    def run_region(self, crop: np.ndarray, region_id: str, mask: Optional[np.ndarray] = None) -> List[EvidenceItem]:
+        items: List[EvidenceItem] = []
+        h, w, _ = crop.shape
+        if h < 32 or w < 32:
+            return items
+        from PIL import Image
+        crop_pil = Image.fromarray(crop)
+        ela_metrics = self._compute_ela(crop_pil)
+        if ela_metrics:
+            mean_err = ela_metrics["mean_error"]
+            if mean_err < 1.0 and self._check_flat_or_indexed(crop):
+                items.append(
+                    make_evidence(
+                        name="ela_minimal_error",
+                        value=ela_metrics,
+                        direction=ProductionMethod.GRAPHIC_DESIGN.value,
+                        strength=0.35,
+                        explanation=f"Region {region_id} shows minimal ELA compression delta and low color entropy.",
+                        region=region_id,
+                    )
+                )
+        return items

@@ -118,3 +118,40 @@ class ForensicsNoiseDetector(BaseDetector):
             return corr
         except Exception:
             return None
+
+    def run_region(self, crop: np.ndarray, region_id: str, mask: Optional[np.ndarray] = None) -> List[EvidenceItem]:
+        items: List[EvidenceItem] = []
+        h, w, _ = crop.shape
+        if h < 24 or w < 24:
+            return items
+
+        lum = 0.299 * crop[:, :, 0] + 0.587 * crop[:, :, 1] + 0.114 * crop[:, :, 2]
+        filtered = median_filter(lum, size=3)
+        residual = lum - filtered
+        noise_std = float(np.std(residual))
+
+        if noise_std < 0.6:
+            items.append(
+                make_evidence(
+                    name="noise_residual_hypersmooth",
+                    value={"noise_std": noise_std},
+                    direction=ProductionMethod.GRAPHIC_DESIGN.value,
+                    strength=0.85,
+                    explanation=f"Region {region_id} exhibits near-zero residual noise (std={noise_std:.2f}); typical of vector/digital graphic.",
+                    region=region_id,
+                )
+            )
+        elif noise_std > 2.0:
+            correlation = self._lum_noise_correlation(lum, np.abs(residual))
+            if correlation is not None and correlation > 0.25:
+                items.append(
+                    make_evidence(
+                        name="sensor_poisson_noise",
+                        value={"lum_noise_corr": correlation},
+                        direction=ProductionMethod.REAL_PHOTO.value,
+                        strength=0.75,
+                        explanation=f"Region {region_id} shows Poisson noise correlation (r={correlation:.2f}) matching physical camera sensors.",
+                        region=region_id,
+                    )
+                )
+        return items

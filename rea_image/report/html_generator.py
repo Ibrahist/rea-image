@@ -298,6 +298,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <h4 style="font-size: 0.95rem;">Reverse Prompt:</h4>
             <pre class="code-block"><button class="copy-btn" onclick="navigator.clipboard.writeText('{{ r.reverse.prompt | replace("'", "\\'") }}')">Copy</button>{{ r.reverse.prompt }}</pre>
             {% endif %}
+            {% if r.top_contradicting %}
+            <div style="margin-top: 10px;">
+              <span style="font-size: 0.85rem; color: #f87171; font-weight: 600;">Contradicting Signals:</span>
+              <ul style="font-size: 0.8rem; color: var(--text-muted); padding-left: 18px; margin-top: 4px;">
+                {% for cev in r.top_contradicting %}
+                <li><strong>{{ cev.name }}</strong> ({{ cev.direction }}, strength {{ "%.2f"|format(cev.strength) }}): {{ cev.explanation }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endif %}
           </div>
         </div>
       </div>

@@ -38,7 +38,6 @@ class ForensicsFrequencyDetector(BaseDetector):
         fft = np.fft.fft2(windowed)
         fft_shift = np.fft.fftshift(fft)
         magnitude = np.abs(fft_shift)
-        log_spectrum = np.log(magnitude + 1.0)
 
         # 1. Detect periodic spectral peaks (artifacts of transposed conv / neural upscalers)
         peaks = self._detect_spectral_peaks(magnitude, crop_size)
@@ -150,3 +149,48 @@ class ForensicsFrequencyDetector(BaseDetector):
             return alpha
         except Exception:
             return None
+
+    def run_region(self, crop: np.ndarray, region_id: str, mask: Optional[np.ndarray] = None) -> List[EvidenceItem]:
+        items: List[EvidenceItem] = []
+        h, w, _ = crop.shape
+        if min(h, w) < 64:
+            return items
+
+        gray = (0.299 * crop[:, :, 0] + 0.587 * crop[:, :, 1] + 0.114 * crop[:, :, 2]).astype(np.float32)
+        crop_size = min(256, 1 << int(np.log2(min(h, w))))
+        start_y = (h - crop_size) // 2
+        start_x = (w - crop_size) // 2
+        c_gray = gray[start_y : start_y + crop_size, start_x : start_x + crop_size]
+
+        win_y = np.hanning(crop_size)
+        win_x = np.hanning(crop_size)
+        windowed = (c_gray - np.mean(c_gray)) * np.outer(win_y, win_x)
+
+        fft = np.fft.fftshift(np.fft.fft2(windowed))
+        mag = np.abs(fft)
+
+        alpha = self._compute_radial_falloff(mag, crop_size)
+        if alpha is not None:
+            if 1.6 <= alpha <= 2.3:
+                items.append(
+                    make_evidence(
+                        name="natural_frequency_falloff",
+                        value={"alpha": alpha},
+                        direction=ProductionMethod.REAL_PHOTO.value,
+                        strength=0.75,
+                        explanation=f"Region {region_id} power spectrum follows natural scene statistics (1/f^{alpha:.2f}).",
+                        region=region_id,
+                    )
+                )
+            elif alpha < 1.3:
+                items.append(
+                    make_evidence(
+                        name="excess_high_frequency_energy",
+                        value={"alpha": alpha},
+                        direction=ProductionMethod.GRAPHIC_DESIGN.value,
+                        strength=0.74,
+                        explanation=f"Region {region_id} shallow spectral slope (alpha={alpha:.2f}) indicates excess high-frequency energy typical of vector sharp edges.",
+                        region=region_id,
+                    )
+                )
+        return items
