@@ -139,3 +139,36 @@ def test_cli_explain_region_filtering_and_missing(tmp_path: Path):
     assert res_err.exit_code == 1
     assert "Region 'region_missing' not found" in res_err.output
 
+
+def test_cli_analyze_formats_and_batch_csv(tmp_path: Path):
+    """Test --format json, --format csv, and folder batch_summary.csv generation."""
+    img1_path = tmp_path / "img1.png"
+    img2_path = tmp_path / "img2.png"
+    img = Image.new("RGB", (120, 120), color=(180, 180, 180))
+    img.save(img1_path)
+    img.save(img2_path)
+
+    # 1. JSON format on single image
+    res_json = runner.invoke(app, ["analyze", str(img1_path), "--format", "json"])
+    assert res_json.exit_code == 0
+    import json
+    data = json.loads(res_json.output.strip())
+    assert data["image"] == "img1.png"
+    assert "verdict" in data
+
+    # 2. CSV format on single image
+    res_csv = runner.invoke(app, ["analyze", str(img1_path), "--format", "csv"])
+    assert res_csv.exit_code == 0
+    assert "image,verdict" in res_csv.output
+    assert "img1.png" in res_csv.output
+
+    # 3. Batch folder run generates batch_summary.csv
+    batch_out = tmp_path / "batch_out"
+    res_folder = runner.invoke(app, ["analyze", str(tmp_path), "--out", str(batch_out)])
+    assert res_folder.exit_code == 0
+    csv_file = batch_out / "batch_summary.csv"
+    assert csv_file.exists()
+    content = csv_file.read_text(encoding="utf-8")
+    assert "img1.png" in content
+    assert "img2.png" in content
+

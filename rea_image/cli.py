@@ -24,13 +24,23 @@ def analyze(
     agent_review: bool = typer.Option(False, "--agent-review", help="Export inspection tasks for agent review."),
     open_browser: bool = typer.Option(False, "--open", help="Open the generated report.html in default browser."),
     recursive: bool = typer.Option(False, "--recursive", "-r", help="Recursively search directory for images."),
+    output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, or csv."),
 ):
     """Analyze one image or a folder of images to reverse-engineer production methods."""
+    import csv
+    import io
+    import json
     from rea_image.ingest.loader import IngestError
     from rea_image.report.orchestrator import run_analysis_pipeline
 
+    fmt = output_format.lower().strip()
+    if fmt not in ("table", "json", "csv"):
+        console.print(f"[bold red]Error:[/bold red] Unsupported format '{output_format}'. Choose table, json, or csv.")
+        raise typer.Exit(code=1)
+
     if not target.exists():
-        console.print(f"[bold red]Error:[/bold red] Target path does not exist: {target}")
+        if fmt == "table":
+            console.print(f"[bold red]Error:[/bold red] Target path does not exist: {target}")
         raise typer.Exit(code=1)
 
     image_paths = []
@@ -41,14 +51,19 @@ def analyze(
             image_paths.extend(glob_func(f"*{ext.upper()}"))
         image_paths = sorted(set(image_paths))
         if not image_paths:
-            console.print(f"[yellow]No supported images found in directory: {target}[/yellow]")
+            if fmt == "table":
+                console.print(f"[yellow]No supported images found in directory: {target}[/yellow]")
+            elif fmt == "json":
+                console.print("[]")
             raise typer.Exit(code=0)
     else:
         image_paths = [target]
 
-    console.print(f"[bold cyan]rea-image analysis[/bold cyan] - processing {len(image_paths)} image(s)...")
+    if fmt == "table":
+        console.print(f"[bold cyan]rea-image analysis[/bold cyan] - processing {len(image_paths)} image(s)...")
 
     all_reports = []
+    batch_records = []
     failures = 0
     for img_path in image_paths:
         try:
@@ -62,9 +77,24 @@ def analyze(
             )
             all_reports.append(report)
             resolved_dir = target_out or Path(f"./rea_output/{img_path.stem}")
-            console.print(f"\n[bold green]✓ Analysis complete for {img_path.name}[/bold green]")
-            console.print(f"  [bold]Verdict:[/bold] {report.verdict.summary}")
-            console.print(f"  [bold]Reports saved to:[/bold] {resolved_dir}")
+
+            record = {
+                "image": img_path.name,
+                "image_path": str(img_path),
+                "verdict": report.verdict.summary,
+                "dominant_method": report.verdict.method_breakdown[0].method if report.verdict.method_breakdown else "unknown",
+                "confidence": report.verdict.confidence,
+                "aspect_ratio": report.image.aspect_ratio,
+                "width": report.image.width,
+                "height": report.image.height,
+                "reports_dir": str(resolved_dir),
+            }
+            batch_records.append(record)
+
+            if fmt == "table":
+                console.print(f"\n[bold green]✓ Analysis complete for {img_path.name}[/bold green]")
+                console.print(f"  [bold]Verdict:[/bold] {report.verdict.summary}")
+                console.print(f"  [bold]Reports saved to:[/bold] {resolved_dir}")
             
             if open_browser:
                 import webbrowser
@@ -73,13 +103,63 @@ def analyze(
                     webbrowser.open(html_file.resolve().as_uri())
         except IngestError as e:
             failures += 1
-            console.print(f"[bold red]Failed to ingest {img_path.name}:[/bold red] {e}")
+            batch_records.append({
+                "image": img_path.name,
+                "image_path": str(img_path),
+                "verdict": f"IngestError: {e}",
+                "dominant_method": "error",
+                "confidence": "none",
+                "aspect_ratio": "unknown",
+                "width": 0,
+                "height": 0,
+                "reports_dir": "",
+            })
+            if fmt == "table":
+                console.print(f"[bold red]Failed to ingest {img_path.name}:[/bold red] {e}")
         except Exception as e:
             failures += 1
-            console.print(f"[bold red]Pipeline error on {img_path.name}:[/bold red] {e}")
+            batch_records.append({
+                "image": img_path.name,
+                "image_path": str(img_path),
+                "verdict": f"Error: {e}",
+                "dominant_method": "error",
+                "confidence": "none",
+                "aspect_ratio": "unknown",
+                "width": 0,
+                "height": 0,
+                "reports_dir": "",
+            })
+            if fmt == "table":
+                console.print(f"[bold red]Pipeline error on {img_path.name}:[/bold red] {e}")
+
+    # Generate batch_summary.csv for directory runs
+    if target.is_dir() and batch_records:
+        series_dir = out or Path("./rea_output")
+        series_dir.mkdir(parents=True, exist_ok=True)
+        csv_file = series_dir / "batch_summary.csv"
+        with open(csv_file, "w", newline="", encoding="utf-8") as f:
+            fieldnames = ["image", "verdict", "dominant_method", "confidence", "aspect_ratio", "width", "height", "reports_dir"]
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            for r in batch_records:
+                writer.writerow(r)
+        if fmt == "table":
+            console.print(f"\n[green]✓ Batch summary CSV exported to {csv_file}[/green]")
+
+    # Machine-readable output formatting
+    if fmt == "json":
+        console.print_json(json.dumps(batch_records if len(batch_records) > 1 else (batch_records[0] if batch_records else {})))
+    elif fmt == "csv":
+        out_buf = io.StringIO()
+        fieldnames = ["image", "verdict", "dominant_method", "confidence", "aspect_ratio", "width", "height", "reports_dir"]
+        writer = csv.DictWriter(out_buf, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for r in batch_records:
+            writer.writerow(r)
+        console.print(out_buf.getvalue().strip())
 
     # Cross-image consistency summary if analyzing a folder of images
-    if target.is_dir() and len(all_reports) > 1:
+    if target.is_dir() and len(all_reports) > 1 and fmt == "table":
         from rea_image.report.consistency import analyze_cross_image_consistency
         series_dir = out or Path("./rea_output")
         consistency = analyze_cross_image_consistency(all_reports, out_dir=series_dir)
