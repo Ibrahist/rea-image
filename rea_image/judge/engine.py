@@ -25,6 +25,8 @@ DETECTOR_CATEGORY_WEIGHTS = {
     "natural_frequency_falloff": 1.5,
     "generator_resolution_signature": 1.4,
     "ela_regional_discrepancy": 1.4,
+    "ela_minimal_error": 0.6,
+    "ela_low_error_resave": 0.1,
     # Visuals / Heuristics (weight 1.0)
     "ai_style_plastic_sheen": 1.0,
     "3d_shader_characteristics": 1.0,

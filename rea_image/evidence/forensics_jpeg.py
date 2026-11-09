@@ -27,17 +27,29 @@ class ForensicsJpegDetector(BaseDetector):
             mean_err = ela_metrics["mean_error"]
             err_var = ela_metrics["error_variance"]
             
-            # If recompression error is extremely low across the board, image was saved with low quality or is flat
+            # Low ELA error only supports vector when flat runs or low unique colors corroborate it
             if mean_err < 1.0:
-                items.append(
-                    make_evidence(
-                        name="ela_minimal_error",
-                        value=ela_metrics,
-                        direction=ProductionMethod.GRAPHIC_DESIGN.value,
-                        strength=0.65,
-                        explanation=f"ELA indicates virtually zero compression delta (mean error={mean_err:.2f}), common in synthetic vector renders or lossless graphics.",
+                is_flat_or_indexed = self._check_flat_or_indexed(arr)
+                if is_flat_or_indexed:
+                    items.append(
+                        make_evidence(
+                            name="ela_minimal_error",
+                            value=ela_metrics,
+                            direction=ProductionMethod.GRAPHIC_DESIGN.value,
+                            strength=0.35,
+                            explanation=f"ELA indicates minimal compression delta (mean error={mean_err:.2f}) with high flat runs or low color entropy, consistent with vector design.",
+                        )
                     )
-                )
+                else:
+                    items.append(
+                        make_evidence(
+                            name="ela_low_error_resave",
+                            value=ela_metrics,
+                            direction="neutral",
+                            strength=0.1,
+                            explanation=f"Low ELA error (mean error={mean_err:.2f}) observed on continuous-tone image; typical of recompressed or web-optimized JPEG.",
+                        )
+                    )
 
             # High variance in error levels across spatial regions indicates splice/composite
             if err_var > 45.0:
@@ -103,6 +115,21 @@ class ForensicsJpegDetector(BaseDetector):
             }
         except Exception:
             return None
+
+    def _check_flat_or_indexed(self, arr: np.ndarray) -> bool:
+        """Check if image has high flat runs or low unique colors characteristic of vectors/graphics."""
+        h, w, _ = arr.shape
+        step_y = max(1, h // 100)
+        sampled = arr[::step_y, :, :]
+        # Flat runs
+        diff_h = np.all(sampled[:, 1:, :] == sampled[:, :-1, :], axis=-1)
+        flat_pct = (float(np.sum(diff_h)) / float(diff_h.size + 1e-5)) * 100.0
+        # Unique colors
+        flat_colors = sampled.reshape(-1, 3)
+        packed = (flat_colors[:, 0].astype(np.uint32) << 16) | (flat_colors[:, 1].astype(np.uint32) << 8) | flat_colors[:, 2].astype(np.uint32)
+        unique_count = len(np.unique(packed))
+        unique_ratio = unique_count / float(len(packed) + 1e-5)
+        return bool(flat_pct > 15.0 or unique_count < 256 or unique_ratio < 0.005)
 
     def _check_blocking_grid(self, arr: np.ndarray) -> Dict[str, Any]:
         """Detect 8x8 JPEG blocking artifacts and check if they align cleanly."""
