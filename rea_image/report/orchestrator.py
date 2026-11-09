@@ -74,7 +74,8 @@ def run_analysis_pipeline(
     seg_fingerprint = hashlib.sha256(json.dumps(seg_summary, sort_keys=True).encode("utf-8")).hexdigest()[:16]
 
     # Stage 3: Evidence Collection
-    detectors = get_active_detectors(disabled=disabled_detectors)
+    skipped_detectors: List[str] = []
+    detectors = get_active_detectors(disabled=disabled_detectors, skipped_detectors=skipped_detectors)
     active_det_names = sorted(type(d).__name__ for d in detectors)
     det_fingerprint = hashlib.sha256(json.dumps(active_det_names, sort_keys=True).encode("utf-8")).hexdigest()[:16]
 
@@ -265,6 +266,10 @@ def run_analysis_pipeline(
         "Heavy platform compression (e.g. social media re-encoding) attenuates high-frequency noise and FFT peaks.",
         "Ethical use: Intended for structural deconstruction and recreation with authorized assets only.",
     ]
+    if skipped_detectors:
+        limitations.append(f"Skipped failed/uninstantiable detector(s): {', '.join(skipped_detectors)}.")
+    if disabled_detectors:
+        limitations.append(f"Disabled detector(s) by user request: {', '.join(disabled_detectors)}.")
 
     report = ReportSchema(
         image=ingest_res.metadata,

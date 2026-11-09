@@ -38,8 +38,20 @@ def analyze(
 
     disabled_list = []
     if disable:
+        from rea_image.evidence import get_detector_registry
+        valid_detectors = set(get_detector_registry().keys())
         for item in disable:
-            disabled_list.extend([x.strip() for x in item.split(",") if x.strip()])
+            for d in item.split(","):
+                d_clean = d.strip().lower()
+                if not d_clean:
+                    continue
+                if d_clean not in valid_detectors:
+                    console.print(
+                        f"[bold red]Error:[/bold red] Unknown detector '{d.strip()}'. "
+                        f"Valid detectors are: {', '.join(sorted(valid_detectors))}"
+                    )
+                    raise typer.Exit(code=1)
+                disabled_list.append(d_clean)
 
     fmt = output_format.lower().strip()
     if fmt not in ("table", "json", "csv"):
