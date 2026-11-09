@@ -85,58 +85,12 @@
 
 ---
 
-## Where This Tool Can Be Used
-
-`rea-image` fits into practical production pipelines across creative, engineering, and investigative workflows:
-
-| Sector / Role                  | Use Case / Environment                                          | Primary Deliverable                                 |
-| :----------------------------- | :-------------------------------------------------------------- | :-------------------------------------------------- |
-| **Designers & Art Directors**  | Moodboard deconstruction, style guides, poster vectorization    | Layered prompts, color roles, `scaffold.svg`        |
-| **Photographers & Studios**    | Reverse-engineering lighting setups, matching client references | ASCII lighting diagram, gear list, `shoot_plan.md`  |
-| **Frontend Engineers**         | Turning UI screenshots into responsive mockups & design tokens  | `scaffold.html`, CSS variables, font candidates     |
-| **3D & Game Artists**          | Reverse-engineering environment lighting and shaders            | `starter_scene.py` (Blender Cycles rig & camera)    |
-| **Trust, Safety & Journalism** | Image authenticity, C2PA validation, tamper/splice detection    | `verdict.txt`, ELA / noise forensics, `report.json` |
-| **Marketing Teams**            | Multi-slide carousel audit, brand palette & tone continuity     | `consistency_summary.json` across image sets        |
-| **Autonomous AI Agents**       | Multi-modal coding pipelines in Claude Code, Codex, Antigravity | `skills/rea-image/SKILL.md`, CLI integration        |
-
-### Practical Workflow Scenarios
-
-1. **Design & Creative Direction**:
-   - **Moodboard & Reference Deconstruction**: Break client references and moodboards into concrete color roles (`background`, `accent`, `text`), lighting schemes, and composition rules.
-   - **Prompt Engineering & Reverse Iteration**: Extract faithful, simplified, and style-transfer prompts from reference imagery to remix concepts in Midjourney, FLUX, or Stable Diffusion without guessing.
-   - **Asset Scaffolding**: Automatically convert posters, banners, and vector assets into clean SVG layouts (`scaffold.svg`) and typography hierarchies.
-
-2. **Photography & Studio Production**:
-   - **Lighting & Shoot Reverse-Engineering**: Turn an editorial photo into a physical shoot plan with an ASCII lighting diagram, closest lighting setup (e.g., Rembrandt, Butterfly, Window Light), camera settings, and a recommended gear list.
-   - **Color Grading & Look Replication**: Extract LUT-style color grading curves, dynamic range balance, and split-toning temperatures to match existing campaign photography.
-
-3. **Frontend Engineering & UI/UX**:
-   - **Screenshot to Code**: Convert UI mockups and web/app screenshots into responsive HTML/CSS structures (`scaffold.html`) with extracted design tokens (radii, type scales, spacing, color variables).
-   - **Typography Audits**: Identify font candidates, text hierarchies, letter tracking, and layout grids directly from raster designs.
-
-4. **3D Visualization & Game Art**:
-   - **Render Inspection**: Determine whether a product or architectural image was generated in Blender, Unreal, or V-Ray via procedural shader falloffs and global illumination tells.
-   - **Scaffold Generation**: Export a starter scene script (`starter_scene.py`) that sets up Blender Cycles with corresponding camera focal lengths, aspect ratios, and studio three-point lighting.
-
-5. **Journalism, Fact-Checking & Trust & Safety**:
-   - **C2PA & Provenance Verification**: Read cryptographic Content Credentials manifests, camera EXIF, and AI generator metadata chunks (A1111, ComfyUI, Midjourney).
-   - **Forensic Tamper Detection**: Spot splicing, double-compression, DCT grid misalignment, and synthetic noise discrepancies between foreground subjects and backgrounds.
-   - **Marketplace & E-commerce Verification**: Validate whether product listings are real physical photographs or synthetic AI/3D mockups.
-
-6. **Marketing Campaigns & Series Consistency**:
-   - **Multi-Slide & Carousel Auditing**: Run folder-level analysis on ad carousels and social series to verify cross-image color palette cohesion, lighting continuity, and aspect ratio alignment (`consistency_summary.json`).
-
-7. **Autonomous AI Coding Agents**:
-   - **Agent Tooling**: Integrated via `skills/rea-image/SKILL.md` into Claude Code, Codex, and Antigravity, allowing agents to autonomously analyze images, inspect region crops, and execute recreation workflows.
-
----
-
 ## Installation
 
 Requirements: Python 3.10+ (tested on Python 3.10, 3.11, 3.12, 3.13, 3.14).
 
 ```bash
-git clone https://github.com/example/rea-image.git
+git clone https://github.com/Ibrahist/rea-image.git
 cd rea-image
 pip install -e .
 ```
@@ -210,7 +164,7 @@ rea_output/
 You can install `rea-image` directly into your agent session using natural language:
 
 ```text
-"Install https://github.com/example/rea-image and break down this image: /path/to/image.png"
+"Install https://github.com/Ibrahist/rea-image and break down this image: /path/to/image.png"
 ```
 
 Or install the package in one command:
@@ -220,7 +174,7 @@ Or install the package in one command:
 pip install -e .
 
 # Or directly from GitHub
-pip install git+https://github.com/example/rea-image.git
+pip install git+https://github.com/Ibrahist/rea-image.git
 
 # Or with uv / pipx
 uv pip install -e .
