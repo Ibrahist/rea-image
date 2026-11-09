@@ -22,6 +22,7 @@ def analyze(
     vlm: Optional[str] = typer.Option(None, "--vlm", help="VLM model identifier for visual review."),
     offline: bool = typer.Option(True, "--offline/--online", help="Force offline mode with no network calls."),
     agent_review: bool = typer.Option(False, "--agent-review", help="Export inspection tasks for agent review."),
+    open_browser: bool = typer.Option(False, "--open", help="Open the generated report.html in default browser."),
 ):
     """Analyze one image or a folder of images to reverse-engineer production methods."""
     from rea_image.ingest.loader import IngestError
@@ -57,12 +58,20 @@ def analyze(
                 agent_review=agent_review,
             )
             all_reports.append(report)
+            resolved_dir = target_out or Path(f"./rea_output/{img_path.stem}")
             console.print(f"\n[bold green]✓ Analysis complete for {img_path.name}[/bold green]")
             console.print(f"  [bold]Verdict:[/bold] {report.verdict.summary}")
-            console.print(f"  [bold]Reports saved to:[/bold] {target_out or f'./rea_output/{img_path.stem}'}")
+            console.print(f"  [bold]Reports saved to:[/bold] {resolved_dir}")
+            
+            if open_browser:
+                import webbrowser
+                html_file = resolved_dir / "report.html"
+                if html_file.exists():
+                    webbrowser.open(html_file.resolve().as_uri())
         except IngestError as e:
             console.print(f"[bold red]Failed to ingest {img_path.name}:[/bold red] {e}")
         except Exception as e:
+            console.print(f"[bold red]Pipeline error on {img_path.name}:[/bold red] {e}")
             console.print(f"[bold red]Pipeline error on {img_path.name}:[/bold red] {e}")
 
     # Cross-image consistency summary if analyzing a folder of images
@@ -86,6 +95,7 @@ def analyze(
 @app.command()
 def report(
     out_dir: Path = typer.Argument(..., help="Output directory containing report.json to rebuild report.html."),
+    open_browser: bool = typer.Option(False, "--open", help="Open rebuilt report.html in default browser."),
 ):
     """Rebuild report.html from report.json in an existing output directory."""
     from rea_image.report.orchestrator import rebuild_html_from_json
@@ -98,6 +108,9 @@ def report(
     console.print(f"[cyan]Rebuilding HTML report in {out_dir}...[/cyan]")
     html_path = rebuild_html_from_json(out_dir)
     console.print(f"[green]✓ Successfully rebuilt report.html at {html_path}[/green]")
+    if open_browser:
+        import webbrowser
+        webbrowser.open(html_path.resolve().as_uri())
 
 
 @app.command(name="apply-review")
