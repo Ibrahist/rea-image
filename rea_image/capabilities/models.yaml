@@ -1,0 +1,66 @@
+models:
+  - id: "flux-1-dev"
+    name: "FLUX.1 [dev]"
+    provider: "Black Forest Labs"
+    max_resolution: "2048x2048"
+    supported_aspect_ratios: ["1:1", "16:9", "9:16", "4:3", "3:4", "4:5", "21:9"]
+    reference_image_support: true
+    text_rendering_quality: "excellent"
+    inpainting_support: true
+    style_control: "high"
+    pricing_tier: "budget"
+    est_cost_per_image: "$0.025"
+    last_verified: "2026-03-01"
+
+  - id: "midjourney-v6"
+    name: "Midjourney v6.1"
+    provider: "Midjourney"
+    max_resolution: "2048x2048"
+    supported_aspect_ratios: ["1:1", "16:9", "9:16", "4:5", "2:3", "3:2", "21:9"]
+    reference_image_support: true
+    text_rendering_quality: "good"
+    inpainting_support: true
+    style_control: "very high"
+    pricing_tier: "standard"
+    est_cost_per_image: "$0.05"
+    last_verified: "2026-03-01"
+
+  - id: "sdxl-1-0"
+    name: "SDXL 1.0 (Stable Diffusion XL)"
+    provider: "Stability AI / Open Source"
+    max_resolution: "1024x1024"
+    supported_aspect_ratios: ["1:1", "1152:896", "896:1152", "1216:832", "832:1216"]
+    reference_image_support: true
+    text_rendering_quality: "moderate"
+    inpainting_support: true
+    style_control: "maximum (ControlNet, LoRA)"
+    pricing_tier: "free/local"
+    est_cost_per_image: "$0.00 (local) / $0.008 (cloud)"
+    last_verified: "2026-03-01"
+
+  - id: "dall-e-3"
+    name: "DALL-E 3"
+    provider: "OpenAI"
+    max_resolution: "1792x1024"
+    supported_aspect_ratios: ["1:1", "1792:1024", "1024:1792"]
+    reference_image_support: false
+    text_rendering_quality: "good"
+    inpainting_support: true
+    style_control: "moderate"
+    pricing_tier: "standard"
+    est_cost_per_image: "$0.04"
+    last_verified: "2026-03-01"
+
+  - id: "recraft-v3"
+    name: "Recraft V3"
+    provider: "Recraft"
+    max_resolution: "2048x2048"
+    supported_aspect_ratios: ["1:1", "16:9", "9:16", "4:3", "3:4"]
+    reference_image_support: true
+    text_rendering_quality: "excellent"
+    inpainting_support: true
+    style_control: "vector + raster design"
+    pricing_tier: "budget"
+    est_cost_per_image: "$0.02"
+    last_verified: "2026-03-01"
+

@@ -1,0 +1,25 @@
+tools:
+  - id: "blender-cycles"
+    category: "3D Render"
+    name: "Blender 4.x (Cycles / Eevee)"
+    license: "GPL (Open Source)"
+    est_cost: "$0.00"
+    controllability: "complete"
+    last_verified: "2026-03-01"
+
+  - id: "figma"
+    category: "Vector / UI"
+    name: "Figma / Penpot"
+    license: "Freemium / Open Source"
+    est_cost: "$0.00"
+    controllability: "pixel-perfect"
+    last_verified: "2026-03-01"
+
+  - id: "dslr-mirrorless-shoot"
+    category: "Photography"
+    name: "Standard DSLR / Mirrorless + 50mm Lens"
+    license: "Hardware"
+    est_cost: "$150 - $500 (rental/day) or existing gear"
+    controllability: "optical reality"
+    last_verified: "2026-03-01"
+
