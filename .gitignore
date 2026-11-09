@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Environments & Caches
+.pytest_cache/
+.cache/
+.env
+.venv/
+env/
+venv/
+
+# Outputs & Artifacts
+rea_output/
+eval/benchmark_data/eval_runs/
