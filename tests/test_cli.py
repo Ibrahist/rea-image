@@ -260,3 +260,15 @@ def test_cli_analyze_parallel_jobs(tmp_path: Path):
     assert (out_dir / "img_1" / "report.json").exists()
     assert (out_dir / "img_2" / "report.json").exists()
 
+
+def test_cli_analyze_no_cache_flag(tmp_path: Path):
+    """Test analyze with --no-cache flag."""
+    img_path = tmp_path / "nocache.png"
+    img = Image.new("RGB", (64, 64), color=(30, 40, 50))
+    img.save(img_path)
+
+    out_dir = tmp_path / "nocache_out"
+    res = runner.invoke(app, ["analyze", str(img_path), "--out", str(out_dir), "--no-cache"])
+    assert res.exit_code == 0
+    assert (out_dir / "report.json").exists()
+

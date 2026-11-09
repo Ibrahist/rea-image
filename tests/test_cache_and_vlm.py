@@ -55,7 +55,12 @@ def test_orchestrator_cache_plumbing(tmp_path: Path):
     sha256 = report1.image.sha256
 
     # Verify cached intermediate entries exist
-    cached_craft = default_cache.get(sha256, "craft_analysis")
+    # Cached keys include SHA256 and fingerprinted step names
+    cached_craft = None
+    for item in (default_cache.cache_dir / sha256[:2] / sha256[2:4]).glob(f"{sha256}_craft_*.json"):
+        import json
+        cached_craft = json.loads(item.read_text(encoding="utf-8"))
+        break
     assert cached_craft is not None
     assert "palette" in cached_craft
 
@@ -63,4 +68,61 @@ def test_orchestrator_cache_plumbing(tmp_path: Path):
     out2 = tmp_path / "out2"
     report2 = run_analysis_pipeline(img_path, out_dir=out2)
     assert report2.verdict.summary == report1.verdict.summary
+
+
+def test_cache_version_invalidation(tmp_path: Path, monkeypatch):
+    """Verify that changing package version invalidates stale cache entries."""
+    from rea_image.report.orchestrator import run_analysis_pipeline
+    import rea_image.report.orchestrator as orch
+
+    img_path = tmp_path / "ver_sample.png"
+    img = Image.new("RGB", (80, 80), color=(120, 140, 160))
+    img.save(img_path)
+
+    # 1. First run with current version
+    rep1 = run_analysis_pipeline(img_path, out_dir=tmp_path / "v1")
+    assert rep1 is not None
+
+    # 2. Patch package version to mock upgrade
+    monkeypatch.setattr(orch, "__version__", "99.0.0")
+
+    # Run with different version should miss earlier cache tags
+    sha256 = rep1.image.sha256
+    v99_files_before = list((orch.default_cache.cache_dir / sha256[:2] / sha256[2:4]).glob(f"{sha256}_evidence_*.json"))
+
+    rep2 = run_analysis_pipeline(img_path, out_dir=tmp_path / "v2")
+    assert rep2 is not None
+
+    v99_files_after = list((orch.default_cache.cache_dir / sha256[:2] / sha256[2:4]).glob(f"{sha256}_evidence_*.json"))
+    # New cache entries under v99 tag must have been created
+    assert len(v99_files_after) > len(v99_files_before)
+
+
+def test_cache_offline_and_vlm_isolation(tmp_path: Path, monkeypatch):
+    """Verify that an earlier offline run does not prevent subsequent VLM evaluation."""
+    from rea_image.report.orchestrator import run_analysis_pipeline
+    from rea_image.evidence.vlm_client import VLMClient
+
+    img_path = tmp_path / "vlm_cache_test.png"
+    img = Image.new("RGB", (80, 80), color=(200, 100, 50))
+    img.save(img_path)
+
+    # Step 1: Run offline
+    rep_offline = run_analysis_pipeline(img_path, out_dir=tmp_path / "offline_run", offline=True)
+    assert not any("vlm" in ev.name for ev in rep_offline.regions[0].evidence)
+
+    # Mock VLMClient to be available and return pseudo-text anomaly
+    monkeypatch.setattr(VLMClient, "is_available", lambda self: True)
+    monkeypatch.setattr(
+        VLMClient,
+        "analyze_visual_semantics",
+        lambda self, preview: {"text_gibberish": True, "anatomy_flaws": False},
+    )
+
+    # Step 2: Run online with VLM model specified
+    rep_online = run_analysis_pipeline(img_path, out_dir=tmp_path / "online_run", offline=False, vlm_model="mock-gpt")
+    
+    # Must have called VLM and added VLM evidence despite prior offline run
+    all_ev_names = [ev.name for ev in rep_online.regions[0].evidence]
+    assert "vlm_pseudo_text_detected" in all_ev_names
 

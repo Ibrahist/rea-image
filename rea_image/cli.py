@@ -27,6 +27,7 @@ def analyze(
     output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, or csv."),
     disable: Optional[List[str]] = typer.Option(None, "--disable", "-d", help="Disable specific detector(s) by name."),
     jobs: int = typer.Option(1, "--jobs", "-j", help="Number of parallel worker threads for folder analysis (default: 1)."),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Disable intermediate disk caching for this run."),
 ):
     """Analyze one image or a folder of images to reverse-engineer production methods."""
     import csv
@@ -79,6 +80,7 @@ def analyze(
                 vlm_model=vlm,
                 agent_review=agent_review,
                 disabled_detectors=disabled_list,
+                no_cache=no_cache,
             )
             resolved_dir = target_out or Path(f"./rea_output/{img_path.stem}")
             record = {

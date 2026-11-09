@@ -253,7 +253,7 @@ def run_evaluation(
     for item in items:
         img_p = Path(item.image_path)
         item_out = out_eval_runs / item.id
-        report = run_analysis_pipeline(img_p, out_dir=item_out, offline=True)
+        report = run_analysis_pipeline(img_p, out_dir=item_out, offline=True, no_cache=True)
 
         predicted_dominant = report.verdict.method_breakdown[0].method if report.verdict.method_breakdown else "unknown"
         is_correct = (predicted_dominant.lower() == item.expected_dominant_method.lower())

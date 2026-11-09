@@ -1,8 +1,11 @@
 """Full analysis pipeline orchestrator connecting all stages M1-M8."""
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from rea_image import __version__
 
 from rea_image.ingest.loader import load_image
 from rea_image.segment.model_hook import segment_image
@@ -49,6 +52,7 @@ def run_analysis_pipeline(
     vlm_model: Optional[str] = None,
     agent_review: bool = False,
     disabled_detectors: Optional[List[str]] = None,
+    no_cache: bool = False,
 ) -> ReportSchema:
     """Run full end-to-end rea-image analysis pipeline on target image."""
     img_path = Path(image_path)
@@ -64,28 +68,44 @@ def run_analysis_pipeline(
     # Stage 2: Segmentation
     seg_regions, confirmed_text_boxes = segment_image(arr, offline=offline, vlm_model=vlm_model, return_text_boxes=True)
 
+    # Fingerprints for cache keys
+    sha256 = ingest_res.metadata.sha256
+    seg_summary = [(r.id, r.label, r.bbox, round(r.area_pct, 2)) for r in seg_regions]
+    seg_fingerprint = hashlib.sha256(json.dumps(seg_summary, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+
     # Stage 3: Evidence Collection
     detectors = get_active_detectors(disabled=disabled_detectors)
-    sha256 = ingest_res.metadata.sha256
-    disabled_key = "_".join(sorted(disabled_detectors or [])) or "all"
-    cache_ev_key = f"evidence_{disabled_key}"
+    active_det_names = sorted(type(d).__name__ for d in detectors)
+    det_fingerprint = hashlib.sha256(json.dumps(active_det_names, sort_keys=True).encode("utf-8")).hexdigest()[:16]
 
-    cached_ev = default_cache.get(sha256, cache_ev_key)
+    ev_meta = json.dumps({"version": __version__, "detectors": det_fingerprint, "seg": seg_fingerprint}, sort_keys=True)
+    cache_ev_key = f"evidence_{hashlib.sha256(ev_meta.encode('utf-8')).hexdigest()[:16]}"
+
+    cached_ev = None if no_cache else default_cache.get(sha256, cache_ev_key)
     if cached_ev is not None:
         global_evidence = [EvidenceItem(**item) for item in cached_ev]
     else:
         global_evidence = []
         for d in detectors:
             global_evidence.extend(d.run(ingest_res, seg_regions))
+        if not no_cache:
+            default_cache.set(sha256, cache_ev_key, [it.model_dump() for it in global_evidence])
 
-        # Optional VLM Semantic Sanity Checks (Opt-in only when online)
-        if not offline or vlm_model:
+    # Optional VLM Semantic Sanity Checks (Opt-in only when online, run outside deterministic cache)
+    if (not offline) or vlm_model:
+        vlm_key_data = json.dumps({"version": __version__, "model": vlm_model or "default"}, sort_keys=True)
+        vlm_cache_tag = f"vlm_{hashlib.sha256(vlm_key_data.encode('utf-8')).hexdigest()[:16]}"
+        cached_vlm = None if no_cache else default_cache.get(sha256, vlm_cache_tag)
+        if cached_vlm is not None:
+            global_evidence.extend([EvidenceItem(**item) for item in cached_vlm])
+        else:
             vlm_client = VLMClient(model=vlm_model, offline=offline)
             if vlm_client.is_available():
                 vlm_res = vlm_client.analyze_visual_semantics(ingest_res.preview)
+                vlm_items = []
                 if vlm_res:
                     if vlm_res.get("anatomy_flaws"):
-                        global_evidence.append(
+                        vlm_items.append(
                             EvidenceItem(
                                 name="vlm_anatomy_anomalies",
                                 value=vlm_res,
@@ -96,7 +116,7 @@ def run_analysis_pipeline(
                             )
                         )
                     if vlm_res.get("text_gibberish"):
-                        global_evidence.append(
+                        vlm_items.append(
                             EvidenceItem(
                                 name="vlm_pseudo_text_detected",
                                 value=vlm_res,
@@ -106,10 +126,15 @@ def run_analysis_pipeline(
                                 explanation="VLM identified pseudo-character glyphs or corrupted background signage.",
                             )
                         )
-        default_cache.set(sha256, cache_ev_key, [it.model_dump() for it in global_evidence])
+                if vlm_items:
+                    global_evidence.extend(vlm_items)
+                    if not no_cache:
+                        default_cache.set(sha256, vlm_cache_tag, [it.model_dump() for it in vlm_items])
 
-    # Stage 3.D/E: Craft & Typography
-    cached_craft = default_cache.get(sha256, "craft_analysis")
+    # Stage 3.D/E: Craft & Typography (fingerprinted by version and segmentation)
+    craft_meta = json.dumps({"version": __version__, "seg": seg_fingerprint}, sort_keys=True)
+    craft_cache_tag = f"craft_{hashlib.sha256(craft_meta.encode('utf-8')).hexdigest()[:16]}"
+    cached_craft = None if no_cache else default_cache.get(sha256, craft_cache_tag)
     if cached_craft is not None:
         camera_info = cached_craft["camera_info"]
         lighting_info = LightingSetupInfo(**cached_craft["lighting_info"])
@@ -122,13 +147,14 @@ def run_analysis_pipeline(
         palette = extract_dominant_palette(arr, n_colors=6)
         color_grade = analyze_color_grade(arr)
         composition = analyze_composition(arr, seg_regions)
-        default_cache.set(sha256, "craft_analysis", {
-            "camera_info": camera_info,
-            "lighting_info": lighting_info.model_dump(),
-            "palette": [p.model_dump() for p in palette],
-            "color_grade": color_grade,
-            "composition": composition.model_dump(),
-        })
+        if not no_cache:
+            default_cache.set(sha256, craft_cache_tag, {
+                "camera_info": camera_info,
+                "lighting_info": lighting_info.model_dump(),
+                "palette": [p.model_dump() for p in palette],
+                "color_grade": color_grade,
+                "composition": composition.model_dump(),
+            })
 
     typography = TypographyAnalyzer().analyze(arr, text_boxes=confirmed_text_boxes)
     layout_grid = analyze_layout_grid(arr, seg_regions)

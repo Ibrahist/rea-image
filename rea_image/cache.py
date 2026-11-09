@@ -1,9 +1,14 @@
 """Disk caching for expensive pipeline steps by image SHA-256 hash."""
 
 import json
+import logging
+import os
 from pathlib import Path
+import threading
 from typing import Any, Optional
 from rea_image.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineCache:
@@ -31,20 +36,28 @@ class PipelineCache:
             if path.exists():
                 with open(path, "r", encoding="utf-8") as f:
                     return json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to read cache entry %s_%s: %s", image_sha256, step_name, e)
         return None
 
     def set(self, image_sha256: str, step_name: str, value: Any) -> None:
-        """Store result in cache."""
+        """Store result in cache atomically via a temporary file in the same directory."""
         if not self.enabled or not image_sha256:
             return
+        temp_path = None
         try:
             path = self._get_path(image_sha256, step_name)
-            with open(path, "w", encoding="utf-8") as f:
+            temp_path = path.with_suffix(f".tmp.{os.getpid()}.{threading.get_ident()}")
+            with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(value, f, ensure_ascii=False)
-        except Exception:
-            pass
+            os.replace(temp_path, path)
+        except Exception as e:
+            logger.debug("Failed to write cache entry %s_%s: %s", image_sha256, step_name, e)
+            if temp_path and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception:
+                    pass
 
     def clear(self) -> None:
         """Wipe entire cache directory."""
@@ -55,4 +68,3 @@ class PipelineCache:
 
 
 default_cache = PipelineCache()
-

@@ -1,8 +1,22 @@
 """Pytest configuration and test fixture generators."""
 
-import pytest
+import os
 from pathlib import Path
 from PIL import Image, ImageDraw
+import pytest
+
+
+@pytest.fixture(autouse=True, scope="session")
+def isolate_test_cache(tmp_path_factory):
+    """Isolate rea-image disk cache to a temporary directory per pytest session."""
+    temp_cache = tmp_path_factory.mktemp("rea_image_test_cache")
+    os.environ["REA_IMAGE_CACHE_DIR"] = str(temp_cache)
+    from rea_image.config import settings
+    from rea_image.cache import default_cache
+    settings.cache_dir = temp_cache
+    default_cache.cache_dir = temp_cache
+    default_cache.enabled = True
+    yield temp_cache
 
 
 @pytest.fixture
