@@ -48,11 +48,31 @@ ASCII_LIGHTING_DIAGRAMS = {
                       |
                  [ Camera ]
     """,
+    "Golden hour": """
+               [ Low-Angle Setting Sun ]
+                           \\
+                            v
+   [Reflector / Scrim]  (  Subject  )
+                            ^
+                            |
+                       [  Camera  ]
+    """,
+    "Overcast": """
+            [ Diffused Sky / Cloud Cover ]
+                        | | |
+                        v v v
+                     (  Subject  )
+                        /   \\
+          [Ambient Light]   [Ambient Light]
+                         ^
+                         |
+                    [  Camera  ]
+    """,
     "default": """
-           [ Background / Backdrop ]
+           [ Ambient Background ]
                       |
                       v
- [Fill Light]   (  Subject  )   [Key Light]
+ [Fill / Bounce] (  Subject  )   [Key Light / Natural Source]
                       ^
                       |
                  [ Camera ]
@@ -69,36 +89,117 @@ class PhotoShootPlanner:
         lighting_info: Dict[str, Any],
         color_info: Dict[str, Any],
         aspect_ratio: str = "3:2",
+        subject_is_human: bool = False,
     ) -> Dict[str, Any]:
-        setup_name = lighting_info.get("matched_setup", "Softbox portrait")
-        diagram = ASCII_LIGHTING_DIAGRAMS.get(setup_name, ASCII_LIGHTING_DIAGRAMS["default"])
+        setup_name = (
+            lighting_info.get("matched_setup")
+            or lighting_info.get("setup_class")
+            or lighting_info.get("name")
+            or "Natural ambient"
+        )
+        
+        # Match diagram
+        diagram = ASCII_LIGHTING_DIAGRAMS.get(setup_name)
+        if not diagram:
+            # Fuzzy match
+            name_lower = setup_name.lower()
+            if "golden" in name_lower:
+                diagram = ASCII_LIGHTING_DIAGRAMS["Golden hour"]
+            elif "overcast" in name_lower:
+                diagram = ASCII_LIGHTING_DIAGRAMS["Overcast"]
+            elif "window" in name_lower:
+                diagram = ASCII_LIGHTING_DIAGRAMS["Window light"]
+            elif "rembrandt" in name_lower:
+                diagram = ASCII_LIGHTING_DIAGRAMS["Rembrandt lighting"]
+            elif "butterfly" in name_lower:
+                diagram = ASCII_LIGHTING_DIAGRAMS["Butterfly / Paramount lighting"]
+            elif "split" in name_lower:
+                diagram = ASCII_LIGHTING_DIAGRAMS["Split lighting"]
+            else:
+                diagram = ASCII_LIGHTING_DIAGRAMS["default"]
 
-        # Determine camera settings
-        focal = camera_info.get("estimated_focal_length", "50mm f/1.8")
-        aperture = camera_info.get("estimated_aperture", "f/2.8")
-        iso = "ISO 100 - 400"
-        shutter = "1/160s (sync speed)"
+        name_lower = setup_name.lower()
+        is_golden = "golden" in name_lower
+        is_overcast = "overcast" in name_lower
+        is_window = "window" in name_lower
+        is_outdoor = is_golden or is_overcast or "outdoor" in name_lower or "sun" in name_lower
+        is_studio = any(s in name_lower for s in ("rembrandt", "butterfly", "split", "loop", "softbox", "ring"))
+
+        # Determine location
+        if is_golden:
+            location = "Outdoor natural setting (open field, yard, garden, or street) during golden hour (30-60m before sunset)"
+        elif is_overcast:
+            location = "Outdoor location in open shade or under soft overcast cloud cover"
+        elif is_window:
+            location = "Indoor location adjacent to a large north-facing natural window"
+        elif is_studio:
+            location = "Photo studio with seamless paper/cyclorama backdrop"
+        else:
+            location = "Controlled photography location matching scene ambient illumination"
+
+        # Camera & lens settings
+        focal = camera_info.get("estimated_focal_length") or "50mm normal lens"
+        aperture = camera_info.get("estimated_aperture") or "f/2.8"
+        focal_class = camera_info.get("focal_length_class", "").lower()
+        is_telephoto = "telephoto" in focal_class or "telephoto" in str(focal).lower()
+
+        # Shutter speed suited to the scene
+        if is_outdoor or is_telephoto or not subject_is_human:
+            shutter = "1/500s - 1/1000s (fast shutter to freeze subject motion in ambient light)"
+            iso = "ISO 100 - 400"
+        elif is_overcast:
+            shutter = "1/250s - 1/500s (handheld camera stability)"
+            iso = "ISO 200 - 800"
+        elif is_studio:
+            shutter = "1/160s (strobe sync speed)"
+            iso = "ISO 100 base"
+        else:
+            shutter = "1/200s"
+            iso = "ISO 100 - 400"
+
+        # Gear list
+        gear_list = list(lighting_info.get("suggested_gear") or lighting_info.get("gear") or [])
+        if is_outdoor:
+            if not gear_list:
+                gear_list = [
+                    "Natural ambient sunlight",
+                    "Foldable 5-in-1 reflector (gold or silver/white)",
+                    "Lens hood to control direct sun flare",
+                ]
+            gear_list.append(f"Camera body paired with {focal}")
+            gear_list.append("Monopod or handheld camera strap for mobility")
+        elif is_studio:
+            if not gear_list:
+                gear_list = [
+                    "Key strobe with softbox or beauty dish",
+                    "White bounce reflector fill",
+                    "Wireless flash trigger transmitter",
+                ]
+            gear_list.append(f"Camera body paired with {focal}")
+            gear_list.append("Heavy-duty studio tripod and light stands")
+        else:
+            gear_list.append(f"Camera body paired with {focal}")
+            gear_list.append("Handheld stabilization or travel tripod")
 
         # Post-processing pipeline
         split_toning = color_info.get("split_toning", "neutral")
+        color_temp = lighting_info.get("color_temperature", "5500K")
         post_processing = [
             f"1. Crop to target aspect ratio: {aspect_ratio}.",
-            f"2. Set White Balance based on lighting temperature: {lighting_info.get('color_temperature', '5500K')}.",
+            f"2. Set White Balance based on lighting temperature: {color_temp}.",
             "3. Exposure compensation: balance highlights and shadow detail in RAW converter.",
             f"4. Color grading: apply tone curves to match {split_toning}.",
-            "5. Frequency separation: subtle skin texture retouching without blurring pores.",
-            "6. Output sharpening: high-pass filter radius 1.2px for web export.",
         ]
 
-        gear_list = list(lighting_info.get("suggested_gear", []))
-        gear_list.extend([
-            f"Full-frame or APS-C camera body with {focal}",
-            "Sturdy tripod and wireless flash trigger",
-            "ColorChecker Passport for accurate color profiling",
-        ])
+        if subject_is_human:
+            post_processing.append("5. Frequency separation: subtle skin texture retouching without blurring pores.")
+        else:
+            post_processing.append("5. Micro-contrast enhancement: refine subject texture (feathers, fur, foliage, or materials) without halo artifacts.")
+
+        post_processing.append("6. Output sharpening: high-pass filter radius 1.2px for web export.")
 
         return {
-            "location": "Photo Studio with seamless backdrop or controlled indoor space",
+            "location": location,
             "camera_settings": {
                 "lens": focal,
                 "aperture": aperture,
@@ -107,7 +208,6 @@ class PhotoShootPlanner:
             },
             "lighting_diagram": diagram.strip(),
             "gear_list": gear_list,
-            "wardrobe_props": "Non-reflective solid colors tailored to the scene palette",
+            "wardrobe_props": "Natural styling tailored to the scene palette and environment",
             "post_processing_steps": post_processing,
         }
-
