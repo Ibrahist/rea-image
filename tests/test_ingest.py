@@ -74,3 +74,17 @@ def test_aspect_ratio_calculations():
     assert calculate_aspect_ratio_str(1000, 1000) == "1:1"
     assert calculate_aspect_ratio_str(1200, 800) == "3:2"
 
+
+def test_heic_without_plugin_error_message(tmp_path: Path, monkeypatch):
+    """Test clear error message when attempting to load a HEIC file without pillow-heif."""
+    import sys
+    monkeypatch.setitem(sys.modules, "pillow_heif", None)
+
+    heic_file = tmp_path / "sample.heic"
+    heic_file.write_bytes(b"dummy heic bytes content")
+
+    with pytest.raises(IngestError) as exc_info:
+        load_image(heic_file)
+    assert "Cannot decode HEIC image" in str(exc_info.value)
+    assert "pip install 'rea-image[heic]'" in str(exc_info.value)
+

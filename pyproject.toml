@@ -34,7 +34,7 @@ heic = [
     "pillow-heif>=0.15.0",
 ]
 avif = [
-    "pillow-heif>=0.15.0",
+    "rea-image[heic]",
 ]
 vlm = [
     "httpx>=0.27.0",

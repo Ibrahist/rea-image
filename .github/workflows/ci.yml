@@ -32,7 +32,7 @@ jobs:
 
       - name: Run Ruff Lint Checks
         run: |
-          ruff check --select F rea_image tests
+          ruff check --select F rea_image tests eval
 
       - name: Run Pytest Test Suite
         run: |
@@ -42,6 +42,11 @@ jobs:
         run: |
           rea-image --help
           python -m rea_image.cli --help
+
+      - name: Test CLI eval and batch parallel analyze
+        run: |
+          rea-image eval eval/benchmark_data/dataset.json --results "${{ runner.temp }}/r.md" --min-accuracy 70.0
+          rea-image analyze eval/benchmark_data/images --jobs 2 --out "${{ runner.temp }}/o"
 
   test-ocr:
     runs-on: ubuntu-latest
@@ -67,5 +72,5 @@ jobs:
 
       - name: Run Pytest with Tesseract installed
         run: |
-          python -m pytest tests/test_regressions.py -v
+          python -m pytest -v
 
