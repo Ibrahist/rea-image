@@ -66,7 +66,9 @@ def test_frequency_periodic_peaks(tmp_path: Path):
     peak_item = next((it for it in items if it.name == "spectral_peaks_upscaler"), None)
     assert peak_item is not None
     assert peak_item.direction == ProductionMethod.AI_GENERATED.value
-    assert peak_item.strength >= 0.80
+    # Uncorroborated periodic peaks must be capped at <= 0.40 to prevent false positives on texture/resizing
+    assert peak_item.strength <= 0.40
+    assert peak_item.strength >= 0.30
 
 
 def test_jpeg_ela_analysis(tmp_path: Path):

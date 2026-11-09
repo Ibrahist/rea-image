@@ -12,6 +12,7 @@ class ForensicsFrequencyDetector(BaseDetector):
 
     def run(self, ingest_res: IngestResult, regions: Optional[list] = None) -> List[EvidenceItem]:
         items: List[EvidenceItem] = []
+        img = ingest_res.rgb_image
         arr = ingest_res.rgb_array
         h, w, _ = arr.shape
 
@@ -43,27 +44,39 @@ class ForensicsFrequencyDetector(BaseDetector):
         peaks = self._detect_spectral_peaks(magnitude, crop_size)
         if peaks.get("has_regular_peaks"):
             peak_count = peaks.get("peak_count", 0)
+            peak_ratio = peaks.get("max_peak_ratio", 0.0)
+            
+            # Check for corroborating generator metadata or chunks in image info
+            info_str = str(getattr(img, "info", {})).lower()
+            is_corroborated = any(k in info_str for k in ("parameters", "prompt", "workflow", "comfyui", "c2pa", "midjourney"))
+
+            # Cap strength at <= 0.4 unless corroborated by hard traces
+            strength = 0.75 if is_corroborated else 0.35
+
             items.append(
                 make_evidence(
                     name="spectral_peaks_upscaler",
                     value=peaks,
                     direction=ProductionMethod.AI_GENERATED.value,
-                    strength=0.86,
-                    explanation=f"2D FFT shows periodic spectral peaks ({peak_count} harmonic spikes), characteristic of convolutional generator upsamplers or latent decoders.",
+                    strength=strength,
+                    explanation=(
+                        f"2D FFT shows periodic spectral peaks ({peak_count} harmonic spikes, ratio={peak_ratio:.1f}). "
+                        f"{'Corroborated by generative metadata.' if is_corroborated else 'Uncorroborated signal; may stem from resizing or compression ringing.'}"
+                    ),
                 )
             )
 
         # 2. Radial frequency falloff slope (natural images obey 1/f^alpha, alpha ~ 2.0)
         alpha = self._compute_radial_falloff(magnitude, crop_size)
         if alpha is not None:
-            if 1.7 <= alpha <= 2.3:
+            if 1.6 <= alpha <= 2.3:
                 items.append(
                     make_evidence(
                         name="natural_frequency_falloff",
                         value={"alpha": alpha},
                         direction=ProductionMethod.REAL_PHOTO.value,
-                        strength=0.68,
-                        explanation=f"Radial frequency power spectrum follows natural scene statistics (1/f^{alpha:.2f}).",
+                        strength=0.75,
+                        explanation=f"Radial frequency power spectrum follows natural scene statistics (1/f^{alpha:.2f}), strongly characteristic of optical photographic capture.",
                     )
                 )
             elif alpha < 1.3:
@@ -91,18 +104,21 @@ class ForensicsFrequencyDetector(BaseDetector):
         mean_val = np.mean(band_vals)
         std_val = np.std(band_vals)
 
-        # Peaks exceeding 8 standard deviations
+        # Peaks exceeding 8 standard deviations with high peak-to-mean ratio
         threshold = mean_val + 8.0 * std_val
         peaks = np.argwhere((magnitude > threshold) & mask)
 
-        # Check if symmetric peaks exist (e.g. 4-fold or 8-fold checkerboard peaks)
         peak_count = len(peaks)
-        has_regular = peak_count >= 4
+        max_ratio = float(np.max(band_vals) / (mean_val + 1e-5))
+        # Periodic upsamplers produce harmonic peaks (e.g. 4 to 250 peaks) with high peak-to-mean ratio.
+        # Massive peak counts (e.g. > 350 peaks like the 574 in textured hen photos) or low ratio
+        # stem from broadband texture noise or general JPEG compression ringing rather than generator upsamplers.
+        has_regular = bool(4 <= peak_count <= 250 and max_ratio >= 10.0)
 
         return {
             "has_regular_peaks": has_regular,
             "peak_count": peak_count,
-            "max_peak_ratio": float(np.max(band_vals) / (mean_val + 1e-5)),
+            "max_peak_ratio": max_ratio,
         }
 
     def _compute_radial_falloff(self, magnitude: np.ndarray, size: int) -> Optional[float]:
