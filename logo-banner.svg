@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="t d">
+  <title id="t">rea-image</title>
+  <desc id="d">rea-image banner: reverse frame logo with the tagline Reverse-engineer any image.</desc>
+  <rect width="1280" height="640" fill="#12151C"/>
+  <g transform="translate(8,69)">
+    <rect x="116" y="120" width="220" height="176" rx="22" fill="none" stroke="#5EEAD4" stroke-width="14"/>
+    <circle cx="170" cy="176" r="18" fill="#5EEAD4"/>
+    <path d="M138 272 L210 200 L258 244 L292 212 L316 272 Z" fill="#5EEAD4"/>
+    <path d="M356 176 L392 176 L392 352 L112 352" fill="none" stroke="#F2994A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M144 322 L112 352 L144 382" fill="none" stroke="#F2994A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="470" y="330" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="120" font-weight="700" fill="#F4F1EA">rea-image</text>
+  <text x="474" y="404" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" font-size="36" fill="#9AA3B5">Reverse-engineer any image.</text>
+</svg>

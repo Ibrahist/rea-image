@@ -1,5 +1,7 @@
 # rea-image
 
+!rea-image[](logo-banner.svg)
+
 > Reverse-engineer any still image: deconstruct how it was made, present measurable evidence, and produce a blueprint to recreate it.
 
 `rea-image` is an open-source tool and AI agent skill to reverse-engineer still images. It analyzes an image or folder of images, classifies every layer/region into its true production method (real photograph, AI-generated, 3D render, graphic design, UI screenshot, illustration, or composite), backs every claim with hard provenance and forensic measurements, and generates actionable recreation blueprints via the cheapest viable path.
@@ -39,15 +41,15 @@
 
 `rea-image` fits into practical production pipelines across creative, engineering, and investigative workflows:
 
-| Sector / Role | Use Case / Environment | Primary Deliverable |
-| :--- | :--- | :--- |
-| **Designers & Art Directors** | Moodboard deconstruction, style guides, poster vectorization | Layered prompts, color roles, `scaffold.svg` |
-| **Photographers & Studios** | Reverse-engineering lighting setups, matching client references | ASCII lighting diagram, gear list, `shoot_plan.md` |
-| **Frontend Engineers** | Turning UI screenshots into responsive mockups & design tokens | `scaffold.html`, CSS variables, font candidates |
-| **3D & Game Artists** | Reverse-engineering environment lighting and shaders | `starter_scene.py` (Blender Cycles rig & camera) |
-| **Trust, Safety & Journalism** | Image authenticity, C2PA validation, tamper/splice detection | `verdict.txt`, ELA / noise forensics, `report.json` |
-| **Marketing Teams** | Multi-slide carousel audit, brand palette & tone continuity | `consistency_summary.json` across image sets |
-| **Autonomous AI Agents** | Multi-modal coding pipelines in Claude Code, Codex, Antigravity | `skills/rea-image/SKILL.md`, CLI integration |
+| Sector / Role                  | Use Case / Environment                                          | Primary Deliverable                                 |
+| :----------------------------- | :-------------------------------------------------------------- | :-------------------------------------------------- |
+| **Designers & Art Directors**  | Moodboard deconstruction, style guides, poster vectorization    | Layered prompts, color roles, `scaffold.svg`        |
+| **Photographers & Studios**    | Reverse-engineering lighting setups, matching client references | ASCII lighting diagram, gear list, `shoot_plan.md`  |
+| **Frontend Engineers**         | Turning UI screenshots into responsive mockups & design tokens  | `scaffold.html`, CSS variables, font candidates     |
+| **3D & Game Artists**          | Reverse-engineering environment lighting and shaders            | `starter_scene.py` (Blender Cycles rig & camera)    |
+| **Trust, Safety & Journalism** | Image authenticity, C2PA validation, tamper/splice detection    | `verdict.txt`, ELA / noise forensics, `report.json` |
+| **Marketing Teams**            | Multi-slide carousel audit, brand palette & tone continuity     | `consistency_summary.json` across image sets        |
+| **Autonomous AI Agents**       | Multi-modal coding pipelines in Claude Code, Codex, Antigravity | `skills/rea-image/SKILL.md`, CLI integration        |
 
 ### Practical Workflow Scenarios
 
@@ -85,15 +87,15 @@
 
 `rea-image` fits into practical production pipelines across creative, engineering, and investigative workflows:
 
-| Sector / Role | Use Case / Environment | Primary Deliverable |
-| :--- | :--- | :--- |
-| **Designers & Art Directors** | Moodboard deconstruction, style guides, poster vectorization | Layered prompts, color roles, `scaffold.svg` |
-| **Photographers & Studios** | Reverse-engineering lighting setups, matching client references | ASCII lighting diagram, gear list, `shoot_plan.md` |
-| **Frontend Engineers** | Turning UI screenshots into responsive mockups & design tokens | `scaffold.html`, CSS variables, font candidates |
-| **3D & Game Artists** | Reverse-engineering environment lighting and shaders | `starter_scene.py` (Blender Cycles rig & camera) |
-| **Trust, Safety & Journalism** | Image authenticity, C2PA validation, tamper/splice detection | `verdict.txt`, ELA / noise forensics, `report.json` |
-| **Marketing Teams** | Multi-slide carousel audit, brand palette & tone continuity | `consistency_summary.json` across image sets |
-| **Autonomous AI Agents** | Multi-modal coding pipelines in Claude Code, Codex, Antigravity | `skills/rea-image/SKILL.md`, CLI integration |
+| Sector / Role                  | Use Case / Environment                                          | Primary Deliverable                                 |
+| :----------------------------- | :-------------------------------------------------------------- | :-------------------------------------------------- |
+| **Designers & Art Directors**  | Moodboard deconstruction, style guides, poster vectorization    | Layered prompts, color roles, `scaffold.svg`        |
+| **Photographers & Studios**    | Reverse-engineering lighting setups, matching client references | ASCII lighting diagram, gear list, `shoot_plan.md`  |
+| **Frontend Engineers**         | Turning UI screenshots into responsive mockups & design tokens  | `scaffold.html`, CSS variables, font candidates     |
+| **3D & Game Artists**          | Reverse-engineering environment lighting and shaders            | `starter_scene.py` (Blender Cycles rig & camera)    |
+| **Trust, Safety & Journalism** | Image authenticity, C2PA validation, tamper/splice detection    | `verdict.txt`, ELA / noise forensics, `report.json` |
+| **Marketing Teams**            | Multi-slide carousel audit, brand palette & tone continuity     | `consistency_summary.json` across image sets        |
+| **Autonomous AI Agents**       | Multi-modal coding pipelines in Claude Code, Codex, Antigravity | `skills/rea-image/SKILL.md`, CLI integration        |
 
 ### Practical Workflow Scenarios
 
@@ -175,6 +177,7 @@ rea-image eval eval/benchmark_data/dataset.json
 ## Output Bundle
 
 When you run `rea-image analyze`, the output folder contains:
+
 ```text
 rea_output/
 ├── verdict.txt        # One-line summary (e.g. "AI-generated 78% + designed text 22%; Midjourney-style; 4:5; confidence medium-high")
@@ -209,6 +212,7 @@ You can install `rea-image` directly into your agent session using natural langu
 ```
 
 Or install the package in one command:
+
 ```bash
 # Install in editable mode
 pip install -e .
@@ -225,26 +229,33 @@ uv pip install -e .
 ### Platform-Specific Setup
 
 #### 1. Claude Code
+
 `rea-image` provides a standard `.claude-plugin/plugin.json` manifest:
+
 ```bash
 # Add as a local or remote plugin
 claude plugin add ./rea-image
 ```
-*Routing:* Claude Code automatically reads `CLAUDE.md` and loads `skills/rea-image/SKILL.md`.
+
+_Routing:_ Claude Code automatically reads `CLAUDE.md` and loads `skills/rea-image/SKILL.md`.
 
 #### 2. Google Antigravity
+
 The skill is located at `skills/rea-image/SKILL.md` and follows the Antigravity Customization standard.
+
 - When opening this repository in Antigravity, the skill is automatically active.
 - To use globally across all your workspaces:
+
   ```bash
   # Windows
   Copy-Item -Recurse skills/rea-image "$env:USERPROFILE\.gemini\antigravity\skills\"
-  
+
   # Linux / macOS
   cp -r skills/rea-image ~/.gemini/antigravity/skills/
   ```
 
 #### 3. OpenAI Codex & Cursor
+
 Codex and Cursor automatically index `AGENTS.md` at the project root. When you attach or reference an image in chat, the agent uses the local CLI or Python module directly.
 
 ---
@@ -254,17 +265,18 @@ Codex and Cursor automatically index `AGENTS.md` at the project root. When you a
 Copy and paste any of these prompts into your agent chat:
 
 - **Full Deconstruction & Recreate Plan**:
-  > *"Break down this visual: how was it made, what is the evidence, and give me a step-by-step plan to recreate it: `./assets/banner.png`"*
+  > _"Break down this visual: how was it made, what is the evidence, and give me a step-by-step plan to recreate it: `./assets/banner.png`"_
 - **Prompt & Style Reverse-Engineering**:
-  > *"Reverse-engineer the generation prompt, lighting rig, and color grade for this image: `./assets/portrait.jpg`"*
+  > _"Reverse-engineer the generation prompt, lighting rig, and color grade for this image: `./assets/portrait.jpg`"_
 - **Forensic Verification & Authenticity**:
-  > *"Check whether this photo is authentic or AI-generated. Run digital forensics and inspect C2PA and EXIF data: `./assets/product.png`"*
+  > _"Check whether this photo is authentic or AI-generated. Run digital forensics and inspect C2PA and EXIF data: `./assets/product.png`"_
 - **Agent Visual Review Mode (Resolving Ambiguities)**:
-  > *"Run `rea-image analyze ./assets/ambiguous.png --agent-review`. Inspect the exported region crops in `layers/`, resolve any questions in `needs_review`, and update the final verdict."*
+  > _"Run `rea-image analyze ./assets/ambiguous.png --agent-review`. Inspect the exported region crops in `layers/`, resolve any questions in `needs_review`, and update the final verdict."_
 
 ---
 
 ## Documentation
+
 - [What It Detects](docs/what-it-detects.md): The 7 production methods, evidence weights, and detector details.
 - [Decomposition Pipeline](docs/decompose.md): Ingest, semantic segmentation, craft extraction, and judgment.
 - [Replication Blueprints](docs/replicate.md): Cheapest-viable-path routing, batching strategy, and prompt construction.
@@ -275,6 +287,7 @@ Copy and paste any of these prompts into your agent chat:
 ---
 
 ## Ethics and Safety
+
 - **Purpose**: Learn structure, lighting, and composition to recreate imagery with assets you have the right to use.
 - **Probabilistic Evidence**: Classification is based on digital forensics and heuristic measurements, not infallible proof. Never use this tool to make personal accusations of fake imagery.
 - **Privacy**: Fully functional offline. No images are uploaded to the cloud without explicit opt-in configuration. No facial identification or biometric recognition is performed.
@@ -282,4 +295,5 @@ Copy and paste any of these prompts into your agent chat:
 ---
 
 ## License
+
 Apache-2.0 License. See [LICENSE](LICENSE) for details.
