@@ -14,6 +14,12 @@ from rea_image.evidence.craft_composition import analyze_composition
 from rea_image.evidence.craft_camera import CameraCraftEstimator
 from rea_image.evidence.craft_lighting import LightingClassifier
 from rea_image.evidence.typography import TypographyAnalyzer, analyze_layout_grid
+from rea_image.evidence.registry import (
+    DETECTORS,
+    register_detector,
+    get_detector_registry,
+    get_active_detectors,
+)
 
 __all__ = [
     "BaseDetector",
@@ -33,4 +39,8 @@ __all__ = [
     "LightingClassifier",
     "TypographyAnalyzer",
     "analyze_layout_grid",
+    "DETECTORS",
+    "register_detector",
+    "get_detector_registry",
+    "get_active_detectors",
 ]

@@ -204,3 +204,42 @@ def test_calibration_tolerance_check():
     assert len(errs) == 1
     assert "is below tolerance floor" in errs[0]
 
+
+def test_pluggable_detectors_and_disable_flag(tmp_path: Path):
+    """Test detector registry, custom registration, and --disable CLI flag."""
+    from rea_image.evidence import get_detector_registry, register_detector, get_active_detectors
+
+    registry = get_detector_registry()
+    assert "frequency" in registry
+    assert "noise" in registry
+
+    # Test custom detector registration
+    class DummyDetector:
+        def run(self, *args, **kwargs):
+            return []
+
+    register_detector("dummy", DummyDetector)
+    assert "dummy" in get_detector_registry()
+
+    # Test disabling
+    active = get_active_detectors(disabled=["frequency", "dummy"])
+    active_types = [type(d).__name__ for d in active]
+    assert "ForensicsFrequencyDetector" not in active_types
+    assert "DummyDetector" not in active_types
+
+    # CLI command: rea-image detectors
+    res_list = runner.invoke(app, ["detectors"])
+    assert res_list.exit_code == 0
+    assert "frequency" in res_list.output
+    assert "ForensicsFrequencyDetector" in res_list.output
+
+    # CLI command: analyze with --disable
+    img_path = tmp_path / "disable_test.png"
+    img = Image.new("RGB", (100, 100), color=(120, 120, 120))
+    img.save(img_path)
+    out_dir = tmp_path / "disable_out"
+
+    res_run = runner.invoke(app, ["analyze", str(img_path), "--out", str(out_dir), "--disable", "frequency,noise"])
+    assert res_run.exit_code == 0
+    assert (out_dir / "report.json").exists()
+

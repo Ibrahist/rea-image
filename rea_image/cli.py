@@ -1,7 +1,7 @@
 """CLI interface for rea-image using Typer and Rich."""
 
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -25,6 +25,7 @@ def analyze(
     open_browser: bool = typer.Option(False, "--open", help="Open the generated report.html in default browser."),
     recursive: bool = typer.Option(False, "--recursive", "-r", help="Recursively search directory for images."),
     output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, or csv."),
+    disable: Optional[List[str]] = typer.Option(None, "--disable", "-d", help="Disable specific detector(s) by name."),
 ):
     """Analyze one image or a folder of images to reverse-engineer production methods."""
     import csv
@@ -32,6 +33,11 @@ def analyze(
     import json
     from rea_image.ingest.loader import IngestError
     from rea_image.report.orchestrator import run_analysis_pipeline
+
+    disabled_list = []
+    if disable:
+        for item in disable:
+            disabled_list.extend([x.strip() for x in item.split(",") if x.strip()])
 
     fmt = output_format.lower().strip()
     if fmt not in ("table", "json", "csv"):
@@ -74,6 +80,7 @@ def analyze(
                 offline=offline,
                 vlm_model=vlm,
                 agent_review=agent_review,
+                disabled_detectors=disabled_list,
             )
             all_reports.append(report)
             resolved_dir = target_out or Path(f"./rea_output/{img_path.stem}")
@@ -550,6 +557,23 @@ def eval_dataset(
             console.print(f"[bold red]Calibration Error:[/bold red] {err}")
         console.print(f"[bold red]Evaluation failed:[/bold red] Confidence calibration exceeds {tolerance}% tolerance.")
         raise typer.Exit(code=1)
+
+
+@app.command(name="detectors")
+def list_detectors():
+    """List all registered and discoverable evidence detectors."""
+    from rea_image.evidence import get_detector_registry
+    
+    registry = get_detector_registry()
+    table = Table(title="Registered rea-image Detectors", show_header=True, header_style="bold magenta")
+    table.add_column("Detector Key", style="cyan")
+    table.add_column("Class Name", style="green")
+    table.add_column("Module", style="white")
+
+    for key, cls in sorted(registry.items()):
+        table.add_row(key, cls.__name__, cls.__module__)
+
+    console.print(table)
 
 
 if __name__ == "__main__":

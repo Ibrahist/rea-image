@@ -7,14 +7,6 @@ from typing import Dict, List, Optional
 from rea_image.ingest.loader import load_image
 from rea_image.segment.model_hook import segment_image
 from rea_image.evidence import (
-    ProvenanceDetector,
-    GeneratorTracesDetector,
-    ExportTracesDetector,
-    ForensicsNoiseDetector,
-    ForensicsJpegDetector,
-    ForensicsFrequencyDetector,
-    ForensicsFlatDetector,
-    VisualChecksDetector,
     extract_dominant_palette,
     analyze_color_grade,
     analyze_composition,
@@ -22,6 +14,7 @@ from rea_image.evidence import (
     LightingClassifier,
     TypographyAnalyzer,
     analyze_layout_grid,
+    get_active_detectors,
 )
 from rea_image.judge import JudgmentEngine, VerdictAggregator
 from rea_image.reverse import (
@@ -52,6 +45,7 @@ def run_analysis_pipeline(
     offline: bool = True,
     vlm_model: Optional[str] = None,
     agent_review: bool = False,
+    disabled_detectors: Optional[List[str]] = None,
 ) -> ReportSchema:
     """Run full end-to-end rea-image analysis pipeline on target image."""
     img_path = Path(image_path)
@@ -68,16 +62,7 @@ def run_analysis_pipeline(
     seg_regions, confirmed_text_boxes = segment_image(arr, offline=offline, vlm_model=vlm_model, return_text_boxes=True)
 
     # Stage 3: Evidence Collection
-    detectors = [
-        ProvenanceDetector(),
-        GeneratorTracesDetector(),
-        ExportTracesDetector(),
-        ForensicsNoiseDetector(),
-        ForensicsJpegDetector(),
-        ForensicsFrequencyDetector(),
-        ForensicsFlatDetector(),
-        VisualChecksDetector(),
-    ]
+    detectors = get_active_detectors(disabled=disabled_detectors)
 
     global_evidence = []
     for d in detectors:
