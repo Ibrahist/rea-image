@@ -65,7 +65,7 @@ def run_analysis_pipeline(
     h, w, _ = arr.shape
 
     # Stage 2: Segmentation
-    seg_regions = segment_image(arr, offline=offline, vlm_model=vlm_model)
+    seg_regions, confirmed_text_boxes = segment_image(arr, offline=offline, vlm_model=vlm_model, return_text_boxes=True)
 
     # Stage 3: Evidence Collection
     detectors = [
@@ -118,7 +118,7 @@ def run_analysis_pipeline(
     palette = extract_dominant_palette(arr, n_colors=6)
     color_grade = analyze_color_grade(arr)
     composition = analyze_composition(arr, seg_regions)
-    typography = TypographyAnalyzer().analyze(arr)
+    typography = TypographyAnalyzer().analyze(arr, text_boxes=confirmed_text_boxes)
     layout_grid = analyze_layout_grid(arr, seg_regions)
 
     # Stage 4: Regional Judgment
@@ -217,6 +217,8 @@ def run_analysis_pipeline(
         composition=composition.model_dump(),
         lighting=lighting_info.model_dump(),
         color_grade=color_grade,
+        typography=typography.model_dump(),
+        layout_grid=layout_grid,
     )
 
     limitations = [

@@ -51,8 +51,25 @@ def test_typography_analyzer():
     assert len(res.font_family_candidates) == 3
     assert "Display" in res.size_hierarchy or "Bold" in res.weight
     assert res.alignment in ("left", "center", "right")
+    assert res.extracted_text == "BIG HEADLINE Subheading line"
+    assert isinstance(res.line_spacing, float)
 
     grid = analyze_layout_grid(arr)
     assert "margins" in grid
     assert "grid_type" in grid
+
+
+def test_typography_and_layout_not_measured_when_empty():
+    """Verify evidence-first: unmeasured values return 'not measured' instead of canned constants."""
+    arr = np.zeros((300, 500, 3), dtype=np.uint8)
+    analyzer = TypographyAnalyzer()
+    res = analyzer.analyze(arr, text_boxes=[])
+    assert res.extracted_text == "not measured"
+    assert res.size_hierarchy == "not measured"
+    assert res.line_spacing == "not measured"
+    assert res.alignment == "not measured"
+
+    grid = analyze_layout_grid(arr, regions=[])
+    assert grid["margins"] == "not measured"
+    assert grid["grid_type"] == "not measured"
 

@@ -10,12 +10,16 @@ def segment_image(
     arr: np.ndarray,
     offline: bool = True,
     vlm_model: Optional[str] = None,
-) -> List[SegmentRegion]:
+    return_text_boxes: bool = False,
+):
     """Segment image into semantic regions.
     
     Uses deterministic classical segmentation offline, with hook for
     SAM / VLM labeling when enabled.
     """
     segmenter = ClassicalSegmenter()
-    return segmenter.segment(arr)
+    regions = segmenter.segment(arr)
+    if return_text_boxes:
+        return regions, segmenter.confirmed_text_boxes
+    return regions
 

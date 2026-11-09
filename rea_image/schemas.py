@@ -1,7 +1,7 @@
 """Data schemas and types for rea-image according to specification."""
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -68,8 +68,8 @@ class TypographyInfo(BaseModel):
     font_family_candidates: List[str] = Field(default_factory=list)
     weight: Optional[str] = None
     size_hierarchy: Optional[str] = None
-    line_spacing: Optional[float] = None
-    tracking: Optional[float] = None
+    line_spacing: Optional[Union[float, str]] = None
+    tracking: Optional[Union[float, str]] = None
     alignment: Optional[str] = None
     text_styling: List[str] = Field(default_factory=list)
     extracted_text: Optional[str] = None
@@ -159,6 +159,8 @@ class GlobalAnalysis(BaseModel):
     composition: Dict[str, Any] = Field(default_factory=dict)
     lighting: Dict[str, Any] = Field(default_factory=dict)
     color_grade: Dict[str, Any] = Field(default_factory=dict)
+    typography: Dict[str, Any] = Field(default_factory=dict)
+    layout_grid: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ReportSchema(BaseModel):

@@ -268,6 +268,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </section>
     </div>
 
+    <!-- Typography & Layout Grid Analysis -->
+    <div class="grid-2">
+      <section class="card">
+        <h2 class="card-title">Typography & Text Analysis</h2>
+        <ul style="list-style: none; font-size: 0.9rem; color: var(--text-muted); line-height: 1.8;">
+          <li>• <strong>Extracted Text:</strong> <span style="color: #fff;">{{ report.global_analysis.typography.extracted_text or 'not measured' }}</span></li>
+          <li>• <strong>Hierarchy:</strong> {{ report.global_analysis.typography.size_hierarchy or 'not measured' }}</li>
+          <li>• <strong>Weight:</strong> {{ report.global_analysis.typography.weight or 'not measured' }}</li>
+          <li>• <strong>Alignment:</strong> {{ report.global_analysis.typography.alignment or 'not measured' }}</li>
+          <li>• <strong>Line Spacing:</strong> {{ report.global_analysis.typography.line_spacing or 'not measured' }}</li>
+          <li>• <strong>Tracking:</strong> {{ report.global_analysis.typography.tracking or 'not measured' }}</li>
+          {% if report.global_analysis.typography.font_family_candidates %}
+          <li>• <strong>Font Candidates:</strong> {{ report.global_analysis.typography.font_family_candidates | join(', ') }}</li>
+          {% endif %}
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Layout Grid & Margins</h2>
+        <ul style="list-style: none; font-size: 0.9rem; color: var(--text-muted); line-height: 1.8;">
+          <li>• <strong>Grid Type:</strong> {{ report.global_analysis.layout_grid.grid_type or 'not measured' }}</li>
+          <li>• <strong>Alignment Axes:</strong> {{ report.global_analysis.layout_grid.alignment_axes or 'not measured' }}</li>
+          <li>• <strong>Container Padding:</strong> {{ report.global_analysis.layout_grid.container_padding or 'not measured' }}</li>
+          {% if report.global_analysis.layout_grid.margins is mapping %}
+          <li>• <strong>Margins (T/R/B/L):</strong> {{ report.global_analysis.layout_grid.margins.top }}px / {{ report.global_analysis.layout_grid.margins.right }}px / {{ report.global_analysis.layout_grid.margins.bottom }}px / {{ report.global_analysis.layout_grid.margins.left }}px</li>
+          {% else %}
+          <li>• <strong>Margins:</strong> {{ report.global_analysis.layout_grid.margins or 'not measured' }}</li>
+          {% endif %}
+          <li>• <strong>Corner Radii:</strong> {{ report.global_analysis.layout_grid.corner_radii or 'not measured' }}</li>
+          <li>• <strong>Card Patterns:</strong> {{ report.global_analysis.layout_grid.card_patterns or 'not measured' }}</li>
+        </ul>
+      </section>
+    </div>
+
     <!-- Per-Region Cards -->
     <section class="card">
       <h2 class="card-title">Decomposed Regions & Recreation Plans</h2>

@@ -13,6 +13,7 @@ class ClassicalSegmenter:
     def __init__(self, max_regions: int = 6):
         self.max_regions = max_regions
         self.ocr_detector = OCRTextDetector()
+        self.confirmed_text_boxes: List[dict] = []
 
     def segment(self, arr: np.ndarray) -> List[SegmentRegion]:
         h, w, _ = arr.shape
@@ -20,6 +21,7 @@ class ClassicalSegmenter:
         assigned_mask = np.zeros((h, w), dtype=bool)
         regions: List[SegmentRegion] = []
         region_counter = 0
+        self.confirmed_text_boxes = []
 
         # 1. First extract text boxes from OCR locator (require confirmed OCR text)
         text_boxes = self.ocr_detector.detect_text_boxes(arr)
@@ -33,6 +35,8 @@ class ClassicalSegmenter:
             alnums = [c for c in text_str if c.isalnum()]
             if not text_str or not words or len(alnums) < 3:
                 continue
+
+            self.confirmed_text_boxes.append(tb)
 
             bx, by, bw, bh = tb["bbox"]
             tmask = np.zeros((h, w), dtype=bool)
