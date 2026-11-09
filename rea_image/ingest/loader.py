@@ -75,6 +75,26 @@ def load_image(file_path: Union[str, Path]) -> IngestResult:
     if file_size == 0:
         raise IngestError(f"File is empty (0 bytes): {path}")
 
+    # Register HEIF / AVIF decoders if requested and available
+    if ext in (".heic", ".heif"):
+        try:
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+        except ImportError:
+            raise IngestError(
+                f"Cannot decode HEIC image '{path.name}': pillow-heif is not installed. "
+                "Install it with: pip install 'rea-image[heic]'"
+            )
+    elif ext == ".avif":
+        try:
+            import pillow_heif
+            pillow_heif.register_avif_opener()
+        except (ImportError, AttributeError):
+            try:
+                import pillow_avif  # noqa: F401
+            except ImportError:
+                pass
+
     # Support large photographic files safely
     Image.MAX_IMAGE_PIXELS = 200_000_000
 
@@ -107,6 +127,16 @@ def load_image(file_path: Union[str, Path]) -> IngestResult:
     except (AnimatedImageError, IngestError):
         raise
     except UnidentifiedImageError as e:
+        if ext in (".heic", ".heif"):
+            raise IngestError(
+                f"Cannot decode HEIC image '{path.name}': pillow-heif is not installed or the file is corrupted. "
+                "Install with: pip install 'rea-image[heic]'"
+            ) from e
+        if ext == ".avif":
+            raise IngestError(
+                f"Cannot decode AVIF image '{path.name}': pillow-heif/pillow-avif is not installed or the file is corrupted. "
+                "Install with: pip install 'rea-image[avif]'"
+            ) from e
         raise IngestError(f"Corrupt or unrecognized image file '{path.name}': {e}") from e
     except Exception as e:
         raise IngestError(f"Failed to open image '{path.name}': {e}") from e

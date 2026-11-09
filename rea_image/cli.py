@@ -23,6 +23,7 @@ def analyze(
     offline: bool = typer.Option(True, "--offline/--online", help="Force offline mode with no network calls."),
     agent_review: bool = typer.Option(False, "--agent-review", help="Export inspection tasks for agent review."),
     open_browser: bool = typer.Option(False, "--open", help="Open the generated report.html in default browser."),
+    recursive: bool = typer.Option(False, "--recursive", "-r", help="Recursively search directory for images."),
 ):
     """Analyze one image or a folder of images to reverse-engineer production methods."""
     from rea_image.ingest.loader import IngestError
@@ -34,9 +35,10 @@ def analyze(
 
     image_paths = []
     if target.is_dir():
-        for ext in (".jpg", ".jpeg", ".png", ".webp", ".heic", ".tiff", ".bmp", ".avif"):
-            image_paths.extend(target.glob(f"*{ext}"))
-            image_paths.extend(target.glob(f"*{ext.upper()}"))
+        glob_func = target.rglob if recursive else target.glob
+        for ext in (".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tiff", ".tif", ".bmp", ".avif"):
+            image_paths.extend(glob_func(f"*{ext}"))
+            image_paths.extend(glob_func(f"*{ext.upper()}"))
         image_paths = sorted(set(image_paths))
         if not image_paths:
             console.print(f"[yellow]No supported images found in directory: {target}[/yellow]")
@@ -47,6 +49,7 @@ def analyze(
     console.print(f"[bold cyan]rea-image analysis[/bold cyan] - processing {len(image_paths)} image(s)...")
 
     all_reports = []
+    failures = 0
     for img_path in image_paths:
         try:
             target_out = (out / img_path.stem) if (out and len(image_paths) > 1) else out
@@ -69,9 +72,10 @@ def analyze(
                 if html_file.exists():
                     webbrowser.open(html_file.resolve().as_uri())
         except IngestError as e:
+            failures += 1
             console.print(f"[bold red]Failed to ingest {img_path.name}:[/bold red] {e}")
         except Exception as e:
-            console.print(f"[bold red]Pipeline error on {img_path.name}:[/bold red] {e}")
+            failures += 1
             console.print(f"[bold red]Pipeline error on {img_path.name}:[/bold red] {e}")
 
     # Cross-image consistency summary if analyzing a folder of images
@@ -90,6 +94,9 @@ def analyze(
             f"• Consistency JSON: {series_dir / 'consistency_summary.json'}",
             expand=False,
         ))
+
+    if failures > 0:
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -123,7 +130,7 @@ def apply_review(
 
     try:
         updated_report = apply_agent_review(out_dir=out_dir, answers_file=answers)
-        console.print(f"[bold green]✓ Agent review applied successfully![/bold green]")
+        console.print("[bold green]✓ Agent review applied successfully![/bold green]")
         console.print(f"  [bold]Updated Verdict:[/bold] {updated_report.verdict.summary}")
         console.print(f"  [bold]Regenerated Artifacts:[/bold] report.json, report.html, verdict.txt in {out_dir}")
     except Exception as e:
@@ -156,10 +163,70 @@ def prompt(
 
     if not has_meta_prompt:
         console.print("[yellow]No embedded metadata prompt found. Generating reverse-engineered prompt...[/yellow]")
+        from rea_image.evidence.craft_camera import CameraCraftEstimator
+        from rea_image.evidence.craft_lighting import LightingClassifier
+        from rea_image.evidence.craft_color import analyze_color_grade, extract_dominant_palette
+        from rea_image.segment import segment_image
+        from rea_image.judge import JudgmentEngine, VerdictAggregator
+        from rea_image.evidence import (
+            ForensicsNoiseDetector,
+            ForensicsJpegDetector,
+            ForensicsFrequencyDetector,
+            ForensicsFlatDetector,
+            VisualChecksDetector,
+            ProvenanceDetector,
+            ExportTracesDetector,
+        )
+
+        arr = res.rgb_array
+        seg_regions = segment_image(arr, offline=True)
+        camera_info = CameraCraftEstimator().estimate(arr, seg_regions)
+        lighting_info = LightingClassifier().classify(arr)
+        color_grade = analyze_color_grade(arr)
+        palette = extract_dominant_palette(arr, n_colors=6)
+
+        detectors = [
+            ProvenanceDetector(),
+            GeneratorTracesDetector(),
+            ExportTracesDetector(),
+            ForensicsNoiseDetector(),
+            ForensicsJpegDetector(),
+            ForensicsFrequencyDetector(),
+            ForensicsFlatDetector(),
+            VisualChecksDetector(),
+        ]
+        evidence = []
+        for d in detectors:
+            evidence.extend(d.run(res, seg_regions))
+
+        judge = JudgmentEngine()
+        reg_verdicts = []
+        for r in seg_regions:
+            va, _, _ = judge.judge_region(r.id, r.label, r.bbox, r.area_pct, evidence)
+            reg_verdicts.append(va)
+        verdict, _ = VerdictAggregator().aggregate(
+            reg_verdicts,
+            evidence,
+            aspect_ratio=res.metadata.aspect_ratio,
+            width=res.metadata.width,
+            height=res.metadata.height,
+            color_grade=color_grade,
+        )
+
+        dominant_colors = [c.hex for c in palette[:3]]
+        palette_desc = f"palette featuring {', '.join(dominant_colors)}"
+        subject_desc = f"subject with {palette_desc}"
+        lighting_dict = lighting_info.model_dump() if hasattr(lighting_info, "model_dump") else (lighting_info or {})
+        setting_desc = f"{lighting_dict.get('matched_setup', 'natural environment').lower()} setting"
+        style_desc = f"{verdict.summary} aesthetic"
+
         p_info = PromptBuilder().build(
-            subject_desc="primary visual subject",
-            setting_desc="ambient scene environment",
-            style_desc="cinematic render",
+            subject_desc=subject_desc,
+            setting_desc=setting_desc,
+            style_desc=style_desc,
+            camera_lens=camera_info,
+            lighting_info=lighting_dict,
+            color_info=color_grade,
             aspect_ratio=res.metadata.aspect_ratio,
         )
         console.print(f"\n[bold]Reconstructed Prompt (Faithful):[/bold]\n\"{p_info.prompt}\"")
@@ -191,8 +258,11 @@ def recreate(
 
     has_generated = False
     for r in regions:
-        recreate_info = r.get("recreate", {})
+        recreate_info = r.get("recreate") or {}
         r_path = recreate_info.get("path")
+        if not r_path:
+            console.print(f"• Region [bold]{r.get('id', 'unknown')}[/bold] ({r.get('label', 'unknown')}): [yellow]SKIPPED[/yellow] (no path specified)")
+            continue
         console.print(f"• Region [bold]{r.get('id')}[/bold] ({r.get('label')}): [green]{r_path.upper()}[/green] via {', '.join(recreate_info.get('tools', []))}")
 
         if r_path == "generate":
@@ -297,7 +367,7 @@ def eval_dataset(
     console.print(Panel(f"[bold cyan]Running rea-image Evaluation Harness[/bold cyan]\nDataset: {dataset}\nOutput: {results_path}", expand=False))
     
     summary = run_evaluation(dataset_manifest=dataset, results_output=results_path)
-    console.print(f"[bold green]✓ Evaluation Complete![/bold green]")
+    console.print("[bold green]✓ Evaluation Complete![/bold green]")
     console.print(f"  • Total benchmark items: [cyan]{summary.total_images}[/cyan]")
     console.print(f"  • Tuning Set Accuracy: [green]{summary.tuning_accuracy_pct}%[/green]")
     console.print(f"  • Held-Out Accuracy: [green]{summary.held_out_accuracy_pct}%[/green]")

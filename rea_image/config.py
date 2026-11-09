@@ -23,7 +23,7 @@ class Settings(BaseModel):
     
     # Supported extensions
     supported_extensions: set[str] = {
-        ".jpg", ".jpeg", ".png", ".webp", ".heic", ".tiff", ".tif", ".bmp", ".avif"
+        ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tiff", ".tif", ".bmp", ".avif"
     }
 
     # VLM Configuration (Optional, opt-in only)

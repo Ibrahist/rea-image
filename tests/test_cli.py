@@ -51,3 +51,52 @@ def test_cli_analyze_and_report_cycle(tmp_path: Path):
     assert res_recreate.exit_code == 0
     assert "Recreation Simulation" in res_recreate.output or "Dry Run" in res_recreate.output
 
+
+def test_cli_analyze_failure_exit_code(tmp_path: Path):
+    """Test that analyze returns non-zero exit code when ingest fails."""
+    corrupt_file = tmp_path / "corrupt.png"
+    corrupt_file.write_text("not a real png image content", encoding="utf-8")
+
+    res = runner.invoke(app, ["analyze", str(corrupt_file)])
+    assert res.exit_code == 1
+    assert "Failed to ingest" in res.output or "Pipeline error" in res.output
+
+
+def test_cli_analyze_recursive(tmp_path: Path):
+    """Test that --recursive searches subdirectories."""
+    sub_dir = tmp_path / "subdir" / "nested"
+    sub_dir.mkdir(parents=True)
+    img = Image.new("RGB", (100, 100), color=(50, 100, 150))
+    img.save(sub_dir / "nested_img.png")
+
+    # Non-recursive should find 0 images
+    res_non_rec = runner.invoke(app, ["analyze", str(tmp_path)])
+    assert res_non_rec.exit_code == 0
+    assert "No supported images found" in res_non_rec.output
+
+    # Recursive should find and process the nested image
+    out_dir = tmp_path / "rec_out"
+    res_rec = runner.invoke(app, ["analyze", str(tmp_path), "--recursive", "--out", str(out_dir)])
+    assert res_rec.exit_code == 0
+    assert "nested_img.png" in res_rec.output
+
+
+def test_cli_recreate_missing_path_does_not_crash(tmp_path: Path):
+    """Test that recreate handles regions without recreate.path gracefully without crashing."""
+    import json
+    out_dir = tmp_path / "corrupt_recreate"
+    out_dir.mkdir()
+    fake_report = {
+        "image": {"aspect_ratio": "1:1"},
+        "regions": [
+            {"id": "r1", "label": "subject", "recreate": None},
+            {"id": "r2", "label": "bg", "recreate": {}},
+            {"id": "r3", "label": "accent", "recreate": {"path": None}},
+        ]
+    }
+    (out_dir / "report.json").write_text(json.dumps(fake_report), encoding="utf-8")
+
+    res = runner.invoke(app, ["recreate", str(out_dir), "--dry-run"])
+    assert res.exit_code == 0
+    assert "SKIPPED" in res.output
+
