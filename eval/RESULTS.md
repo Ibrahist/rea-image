@@ -28,8 +28,8 @@ Calibration measures whether a stated confidence score reflects actual true accu
 
 | Confidence Bin | Samples | Correct Calls | Empirical Accuracy | Calibration Assessment |
 |---|:---:|:---:|:---:|---|
-| High (0.80+) | 2 | 2 | **100.0%** | Well calibrated |
-| Medium-High (0.65-0.80) | 1 | 1 | **100.0%** | Well calibrated |
+| High (0.80+) | 0 | 0 | **0.0%** | Unpopulated |
+| Medium-High (0.65-0.80) | 3 | 3 | **100.0%** | Well calibrated |
 | Medium (0.45-0.65) | 6 | 5 | **83.3%** | Well calibrated |
 | Low (<0.45) | 0 | 0 | **0.0%** | Unpopulated |
 
@@ -43,8 +43,8 @@ Calibration measures whether a stated confidence score reflects actual true accu
 | `ai_tuning_comp` | tuning | compressed | AI-generated | AI-generated | medium-low | 100.0% |
 | `graphic_tuning_orig` | tuning | original | vector or graphic design | vector or graphic design | medium-low | 100.0% |
 | `graphic_heldout_ss` | held_out | screenshot | vector or graphic design | vector or graphic design | medium-low | 100.0% |
-| `photo_heldout_orig` | held_out | original | real photograph | real photograph | high | 100.0% |
-| `photo_heldout_comp` | held_out | compressed | real photograph | real photograph | high | 100.0% |
+| `photo_heldout_orig` | held_out | original | real photograph | real photograph | medium-high | 100.0% |
+| `photo_heldout_comp` | held_out | compressed | real photograph | real photograph | medium-high | 100.0% |
 | `photo_heldout_ss` | held_out | screenshot | real photograph | real photograph | medium | 100.0% |
 | `ai_heldout_ss` | held_out | screenshot | AI-generated | real photograph | medium-low | 0.0% |
 | `ai_heldout_orig` | held_out | original | AI-generated | AI-generated | medium-high | 100.0% |
