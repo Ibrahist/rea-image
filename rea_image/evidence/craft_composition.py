@@ -1,6 +1,6 @@
 """Composition analysis: rule of thirds, golden ratio, leading lines, framing, and negative space."""
 
-from typing import Any, Dict, List, Optional
+from typing import Optional
 import numpy as np
 from rea_image.schemas import CompositionInfo
 from rea_image.ingest.metadata_extractor import calculate_aspect_ratio_str

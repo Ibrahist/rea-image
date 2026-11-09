@@ -1,6 +1,5 @@
 """Export traces detector: Photoshop/Canva/Figma signatures and JPEG quantization tables."""
 
-import io
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import numpy as np

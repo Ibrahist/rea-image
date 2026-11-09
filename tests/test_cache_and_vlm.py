@@ -2,7 +2,6 @@
 
 from pathlib import Path
 from PIL import Image
-import pytest
 from rea_image.cache import PipelineCache
 from rea_image.evidence.vlm_client import VLMClient
 

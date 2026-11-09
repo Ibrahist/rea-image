@@ -1,6 +1,6 @@
 """OCR detection and text region extraction."""
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import numpy as np
 from scipy.ndimage import uniform_filter, label, find_objects
 

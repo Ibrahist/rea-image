@@ -2,7 +2,6 @@
 
 from pathlib import Path
 from PIL import Image
-import pytest
 from rea_image.report.orchestrator import run_analysis_pipeline
 from rea_image.report.consistency import analyze_cross_image_consistency
 

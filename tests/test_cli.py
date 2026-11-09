@@ -2,7 +2,6 @@
 
 from pathlib import Path
 from PIL import Image, ImageDraw
-import pytest
 from typer.testing import CliRunner
 from rea_image.cli import app
 

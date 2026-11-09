@@ -1,6 +1,6 @@
 """Color grade, dominant palette extraction, and film/LUT analysis."""
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 import numpy as np
 from rea_image.schemas import PaletteColor
 

@@ -1,6 +1,6 @@
 """Pluggable generation backend with dry-run and confirmation safeguards."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from rich.console import Console
 from rich.panel import Panel
 

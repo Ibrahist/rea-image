@@ -1,6 +1,6 @@
 """3D Render scaffold generator: scene notes, shader setups, and Blender Python script."""
 
-from typing import Any, Dict, List
+from typing import List
 
 
 class RenderScaffoldBuilder:

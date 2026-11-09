@@ -1,9 +1,9 @@
 """Capability table loader and models schema."""
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class ModelCapability(BaseModel):

@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Optional
 from rea_image.schemas import ReportSchema, ProductionMethod, EvidenceItem
 from rea_image.report.json_exporter import export_report_json
 from rea_image.report.html_generator import generate_report_html

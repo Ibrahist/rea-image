@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from rea_image.schemas import EvidenceItem, ProductionMethod
+from rea_image.schemas import EvidenceItem
 from rea_image.ingest.loader import IngestResult
 
 

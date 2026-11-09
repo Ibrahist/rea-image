@@ -2,14 +2,11 @@
 
 import ast
 import xml.etree.ElementTree as ET
-from pathlib import Path
-import pytest
 from rea_image.capabilities.loader import CapabilitiesRegistry
 from rea_image.reverse.prompt_builder import PromptBuilder
 from rea_image.reverse.photo_shoot_plan import PhotoShootPlanner
 from rea_image.reverse.render_scaffold import RenderScaffoldBuilder
 from rea_image.reverse.graphic_scaffold import GraphicScaffoldBuilder
-from rea_image.reverse.ui_scaffold import UIScaffoldBuilder
 from rea_image.replicate.planner import ReplicationPlanner
 from rea_image.replicate.backend import GenerationBackend
 from rea_image.schemas import PaletteColor, ProductionMethod, RegionAnalysis

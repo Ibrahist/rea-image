@@ -1,7 +1,7 @@
 """Area-weighted whole-image judgment aggregator and verdict summary generator."""
 
 from collections import defaultdict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from rea_image.schemas import MethodBreakdownItem, ProductionMethod, RegionAnalysis, Verdict
 from rea_image.judge.style_matcher import estimate_ai_model_family
 

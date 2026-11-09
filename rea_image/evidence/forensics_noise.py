@@ -1,6 +1,6 @@
 """Forensic noise analysis: residual noise profile, Poisson-Gaussian correlation, and regional uniformity."""
 
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 import numpy as np
 from scipy.ndimage import median_filter
 from rea_image.evidence.base import BaseDetector, make_evidence

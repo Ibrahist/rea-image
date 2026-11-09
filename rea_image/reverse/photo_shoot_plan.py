@@ -1,6 +1,6 @@
 """Photographic shoot planner with ASCII lighting diagrams, gear lists, and post-processing steps."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 
 ASCII_LIGHTING_DIAGRAMS = {

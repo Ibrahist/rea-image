@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 import numpy as np
 from PIL import Image, ImageOps, UnidentifiedImageError
 from rea_image.config import settings

@@ -1,7 +1,6 @@
 """Self-contained interactive HTML report generator."""
 
 from pathlib import Path
-from typing import Optional
 from jinja2 import Template
 from rea_image.schemas import ReportSchema
 

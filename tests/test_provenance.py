@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 from PIL import Image, PngImagePlugin
-import pytest
 from rea_image.ingest.loader import load_image
 from rea_image.evidence.provenance import ProvenanceDetector
 from rea_image.evidence.generator_traces import GeneratorTracesDetector

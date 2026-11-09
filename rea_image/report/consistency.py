@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import numpy as np
-from rea_image.schemas import ReportSchema, PaletteColor
+from rea_image.schemas import ReportSchema
 
 
 def analyze_cross_image_consistency(

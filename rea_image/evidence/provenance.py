@@ -1,8 +1,6 @@
 """Provenance detector: EXIF, XMP, IPTC, and C2PA Content Credentials."""
 
-import io
 import re
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from PIL import Image, ExifTags, IptcImagePlugin

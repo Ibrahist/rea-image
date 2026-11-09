@@ -1,7 +1,7 @@
 """Conflict detector and agent review task generator."""
 
 from typing import List, Tuple
-from rea_image.schemas import EvidenceItem, NeedsReviewItem, ProductionMethod
+from rea_image.schemas import EvidenceItem, NeedsReviewItem
 
 
 class ConflictDetector:

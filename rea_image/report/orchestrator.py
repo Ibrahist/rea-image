@@ -3,9 +3,8 @@
 import json
 from pathlib import Path
 from typing import List, Optional
-from PIL import Image
 
-from rea_image.ingest.loader import load_image, IngestResult
+from rea_image.ingest.loader import load_image
 from rea_image.segment.model_hook import segment_image
 from rea_image.evidence import (
     ProvenanceDetector,
@@ -24,7 +23,7 @@ from rea_image.evidence import (
     TypographyAnalyzer,
     analyze_layout_grid,
 )
-from rea_image.judge import JudgmentEngine, VerdictAggregator, estimate_ai_model_family
+from rea_image.judge import JudgmentEngine, VerdictAggregator
 from rea_image.reverse import (
     PromptBuilder,
     PhotoShootPlanner,

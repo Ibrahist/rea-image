@@ -1,6 +1,6 @@
 """AI model family style estimator: probabilistic style heuristic."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 
 def estimate_ai_model_family(

@@ -1,11 +1,9 @@
 """Tests for judgment engine, conflict detection, and verdict aggregation (M6)."""
 
-import pytest
 from rea_image.schemas import EvidenceItem, ProductionMethod
 from rea_image.judge.engine import JudgmentEngine
 from rea_image.judge.conflict import ConflictDetector
 from rea_image.judge.aggregator import VerdictAggregator
-from rea_image.judge.style_matcher import estimate_ai_model_family
 
 
 def test_hard_metadata_beats_forensics():

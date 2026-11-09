@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 from PIL import Image, ImageDraw
-import pytest
 from rea_image.report.orchestrator import run_analysis_pipeline, rebuild_html_from_json
 from rea_image.schemas import ReportSchema
 

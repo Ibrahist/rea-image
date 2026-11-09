@@ -1,12 +1,9 @@
 """Tests for camera optics, lighting setups, typography, and visual checks (M5)."""
 
-from pathlib import Path
 import numpy as np
-import pytest
 from rea_image.evidence.craft_camera import CameraCraftEstimator
 from rea_image.evidence.craft_lighting import LightingClassifier
 from rea_image.evidence.typography import TypographyAnalyzer, analyze_layout_grid
-from rea_image.evidence.visual_checks import VisualChecksDetector
 
 
 def test_camera_craft_estimator():

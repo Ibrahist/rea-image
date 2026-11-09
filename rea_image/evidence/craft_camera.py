@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 import numpy as np
-from scipy.ndimage import gaussian_filter, laplace
+from scipy.ndimage import laplace
 
 
 class CameraCraftEstimator:

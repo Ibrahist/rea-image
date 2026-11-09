@@ -1,6 +1,5 @@
 """Lighting setup classification: 12 standard lighting rigs, direction, softness, and gear lists."""
 
-from typing import Any, Dict, List, Optional
 import numpy as np
 from rea_image.schemas import LightingSetupInfo
 

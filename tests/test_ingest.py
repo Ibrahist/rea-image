@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from PIL import Image
 from rea_image.ingest.loader import load_image, IngestError, AnimatedImageError
-from rea_image.ingest.hashing import compute_sha256, compute_dhash, compute_phash
+from rea_image.ingest.hashing import compute_dhash, compute_phash
 from rea_image.ingest.metadata_extractor import calculate_aspect_ratio_str
 
 

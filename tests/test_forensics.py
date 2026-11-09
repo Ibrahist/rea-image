@@ -3,7 +3,6 @@
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
-import pytest
 from rea_image.ingest.loader import load_image
 from rea_image.evidence.forensics_noise import ForensicsNoiseDetector
 from rea_image.evidence.forensics_jpeg import ForensicsJpegDetector
