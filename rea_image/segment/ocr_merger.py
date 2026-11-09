@@ -61,8 +61,22 @@ class OCRTextDetector:
                     text_boxes.append({
                         "bbox": [bx, by, bw, bh],
                         "confidence": float(min(0.95, density * 2.0)),
-                        "text": "",  # Populated if OCR engine installed
+                        "text": "",  # Populated below if OCR engine installed
                     })
+
+        # Attempt OCR text extraction if pytesseract is available
+        if text_boxes:
+            try:
+                import pytesseract
+                from PIL import Image
+                pil_img = Image.fromarray(arr)
+                for box in text_boxes:
+                    bx, by, bw, bh = box["bbox"]
+                    crop = pil_img.crop((bx, by, bx + bw, by + bh))
+                    extracted = pytesseract.image_to_string(crop, config="--psm 6").strip()
+                    box["text"] = extracted
+            except Exception:
+                pass
 
         return text_boxes
 

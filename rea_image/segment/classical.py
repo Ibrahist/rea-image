@@ -21,12 +21,18 @@ class ClassicalSegmenter:
         regions: List[SegmentRegion] = []
         region_counter = 0
 
-        # 1. First extract text boxes from OCR locator
+        # 1. First extract text boxes from OCR locator (require confirmed OCR text)
         text_boxes = self.ocr_detector.detect_text_boxes(arr)
         # Sort text boxes by area descending
         text_boxes = sorted(text_boxes, key=lambda b: b["bbox"][2] * b["bbox"][3], reverse=True)[:3]
 
         for tb in text_boxes:
+            # Require confirmed OCR text before labeling any region as text_block
+            text_str = tb.get("text", "").strip()
+            alnums = [c for c in text_str if c.isalnum()]
+            if len(alnums) < 2:
+                continue
+
             bx, by, bw, bh = tb["bbox"]
             tmask = np.zeros((h, w), dtype=bool)
             tmask[by : by + bh, bx : bx + bw] = True
