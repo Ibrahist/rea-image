@@ -484,13 +484,35 @@ Calibration measures whether a stated confidence score reflects actual true accu
     for res in results_per_item:
         md_content += f"| `{res['id']}` | {res['split']} | {res['condition']} | {res['expected']} | {res['predicted']} | {res['confidence']} | {res['area_accuracy']:.1f}% |\n"
 
-    md_content += """
+    # Derived metrics for dynamic findings
+    high_bin = next((cb for cb in calib_bins if "High" in cb.bin_name), None)
+    high_bin_samples = high_bin.sample_count if high_bin else 0
+    hard_prov_ids = {"ai_tuning_orig", "photo_tuning_orig", "photo_heldout_orig", "ai_heldout_orig"}
+    orig_provenance_confs = sorted(set(
+        r["confidence"] for r in results_per_item
+        if r["id"] in hard_prov_ids
+    ))
+    provenance_conf_str = ", ".join(orig_provenance_confs) if orig_provenance_confs else "medium-high"
+
+    compressed_misses = [
+        r["id"] for r in results_per_item
+        if r["condition"] == "compressed" and r["predicted"] != r["expected"]
+    ]
+    comp_miss_str = ", ".join(f"`{m}`" for m in compressed_misses) if compressed_misses else "none"
+
+    screenshot_misses = [
+        r["id"] for r in results_per_item
+        if r["condition"] == "screenshot" and r["predicted"] != r["expected"]
+    ]
+    ss_miss_str = ", ".join(f"`{m}`" for m in screenshot_misses) if screenshot_misses else "none"
+
+    md_content += f"""
 ---
 
 ## 4. Key Findings and Degradation Notes
-1. **Hard Provenance Strength**: When C2PA manifests or PNG generator chunks are present in clean originals, accuracy is 100% with High confidence, without spurious conflict downgrades from weak heuristic signals.
-2. **Compression Resilience**: When JPEG compression (<70 quality) is introduced, the `compression_degradation_penalty` detector successfully attenuates forensic weights and appropriately prevents overconfident false positives.
-3. **Screenshot Detection & Resampling Limits**: Resampled flat runs (accounting for interpolation filter kernels) and axis-aligned edge projections reliably identify vector graphic and UI mockups even after screen-capture resampling. However, screenshots of generative AI images lose PNG metadata and C2PA credentials, and resampled diffusion textures without clear periodic convolution artifacts remain challenging without manual/VLM review.
+1. **Hard Provenance Strength**: When C2PA manifests, camera EXIF, or PNG generator chunks are present in clean originals, hard provenance produces correct calls with {provenance_conf_str} confidence (noting that the High confidence bin currently has {high_bin_samples} samples, as calibration thresholds map these scores to {provenance_conf_str}).
+2. **Compression Resilience**: On platform-compressed files, the benchmark achieves {summary.compressed_accuracy_pct}% accuracy. The `compression_degradation_penalty` detector attenuates forensic weights under JPEG compression, though high compression on synthetic patterns can cause misclassifications (notably {comp_miss_str} misclassified as graphic design).
+3. **Screenshot Detection & Resampling Limits**: Across screen-captured and resampled images, accuracy is {summary.screenshot_accuracy_pct}%. Resampled flat runs and axis-aligned edge projections identify vector graphic and UI mockups, but screenshots of generative AI images ({ss_miss_str}) fail when resampling strips generation metadata and smooths periodic lattice artifacts into continuous optical-like gradients.
 4. **Dataset Limitations**: This benchmark evaluates synthetic test fixtures designed to isolate specific forensic dimensions (DCT quantization, Poisson sensor noise, and screen-capture resampling). Real-world wild images may exhibit combined compression, multiple resaves, or mixed media workflows that warrant agent or human verification.
 """
 
