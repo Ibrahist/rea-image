@@ -1,0 +1,262 @@
+"""Full analysis pipeline orchestrator connecting all stages M1-M8."""
+
+import json
+from pathlib import Path
+from typing import List, Optional
+from PIL import Image
+
+from rea_image.ingest.loader import load_image, IngestResult
+from rea_image.segment.model_hook import segment_image
+from rea_image.evidence import (
+    ProvenanceDetector,
+    GeneratorTracesDetector,
+    ExportTracesDetector,
+    ForensicsNoiseDetector,
+    ForensicsJpegDetector,
+    ForensicsFrequencyDetector,
+    ForensicsFlatDetector,
+    VisualChecksDetector,
+    extract_dominant_palette,
+    analyze_color_grade,
+    analyze_composition,
+    CameraCraftEstimator,
+    LightingClassifier,
+    TypographyAnalyzer,
+    analyze_layout_grid,
+)
+from rea_image.judge import JudgmentEngine, VerdictAggregator, estimate_ai_model_family
+from rea_image.reverse import (
+    PromptBuilder,
+    PhotoShootPlanner,
+    RenderScaffoldBuilder,
+    GraphicScaffoldBuilder,
+    UIScaffoldBuilder,
+)
+from rea_image.replicate import ReplicationPlanner
+from rea_image.cache import default_cache
+from rea_image.evidence.vlm_client import VLMClient
+from rea_image.schemas import (
+    GlobalAnalysis,
+    ReportSchema,
+    NeedsReviewItem,
+    EvidenceItem,
+    ProductionMethod,
+)
+from rea_image.report.json_exporter import export_report_json
+from rea_image.report.html_generator import generate_report_html
+from rea_image.report.assets_exporter import export_assets_bundle
+
+
+def run_analysis_pipeline(
+    image_path: Path,
+    out_dir: Optional[Path] = None,
+    offline: bool = True,
+    vlm_model: Optional[str] = None,
+    agent_review: bool = False,
+) -> ReportSchema:
+    """Run full end-to-end rea-image analysis pipeline on target image."""
+    img_path = Path(image_path)
+    if out_dir is None:
+        out_dir = Path("./rea_output") / img_path.stem
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Stage 1: Ingest
+    ingest_res = load_image(img_path)
+    arr = ingest_res.rgb_array
+    h, w, _ = arr.shape
+
+    # Stage 2: Segmentation
+    seg_regions = segment_image(arr, offline=offline, vlm_model=vlm_model)
+
+    # Stage 3: Evidence Collection
+    detectors = [
+        ProvenanceDetector(),
+        GeneratorTracesDetector(),
+        ExportTracesDetector(),
+        ForensicsNoiseDetector(),
+        ForensicsJpegDetector(),
+        ForensicsFrequencyDetector(),
+        ForensicsFlatDetector(),
+        VisualChecksDetector(),
+    ]
+
+    global_evidence = []
+    for d in detectors:
+        global_evidence.extend(d.run(ingest_res, seg_regions))
+
+    # Optional VLM Semantic Sanity Checks (Opt-in only when online)
+    if not offline or vlm_model:
+        vlm_client = VLMClient(model=vlm_model, offline=offline)
+        if vlm_client.is_available():
+            vlm_res = vlm_client.analyze_visual_semantics(ingest_res.preview)
+            if vlm_res:
+                if vlm_res.get("anatomy_flaws"):
+                    global_evidence.append(
+                        EvidenceItem(
+                            name="vlm_anatomy_anomalies",
+                            value=vlm_res,
+                            region="global",
+                            direction=ProductionMethod.AI_GENERATED.value,
+                            strength=0.88,
+                            explanation="VLM detected anatomical flaws (malformed hands, asymmetric eyes, or extra digits).",
+                        )
+                    )
+                if vlm_res.get("text_gibberish"):
+                    global_evidence.append(
+                        EvidenceItem(
+                            name="vlm_pseudo_text_detected",
+                            value=vlm_res,
+                            region="global",
+                            direction=ProductionMethod.AI_GENERATED.value,
+                            strength=0.85,
+                            explanation="VLM identified pseudo-character glyphs or corrupted background signage.",
+                        )
+                    )
+
+    # Stage 3.D/E: Craft & Typography
+    camera_info = CameraCraftEstimator().estimate(arr, seg_regions)
+    lighting_info = LightingClassifier().classify(arr)
+    palette = extract_dominant_palette(arr, n_colors=6)
+    color_grade = analyze_color_grade(arr)
+    composition = analyze_composition(arr, seg_regions)
+    typography = TypographyAnalyzer().analyze(arr)
+    layout_grid = analyze_layout_grid(arr, seg_regions)
+
+    # Stage 4: Regional Judgment
+    judge_engine = JudgmentEngine()
+    region_analyses = []
+    all_needs_review: List[NeedsReviewItem] = []
+
+    for r in seg_regions:
+        reg_analysis, contradictions, review_items = judge_engine.judge_region(
+            region_id=r.id,
+            label=r.label,
+            bbox=r.bbox,
+            area_pct=r.area_pct,
+            evidence_list=list(global_evidence),  # inherit global signals + regional
+        )
+        reg_analysis.palette = palette[:3]
+        all_needs_review.extend(review_items)
+        region_analyses.append(reg_analysis)
+
+    # Stage 5 & 6: Reverse Engineering & Replication Planning
+    prompt_builder = PromptBuilder()
+    shoot_planner = PhotoShootPlanner()
+    render_builder = RenderScaffoldBuilder()
+    svg_builder = GraphicScaffoldBuilder()
+    ui_builder = UIScaffoldBuilder()
+    rep_planner = ReplicationPlanner()
+
+    shoot_plan_data = shoot_planner.plan(
+        camera_info=camera_info,
+        lighting_info=lighting_info.model_dump(),
+        color_info=color_grade,
+        aspect_ratio=ingest_res.metadata.aspect_ratio,
+    )
+    blender_script = render_builder.build_blender_script(
+        scene_name=img_path.stem,
+        palette_colors=[p.hex for p in palette],
+    )
+    svg_scaffold = svg_builder.build_svg(
+        width=w,
+        height=h,
+        palette=palette,
+        regions=region_analyses,
+    )
+    html_scaffold = ui_builder.build_html_css(palette=palette, regions=region_analyses)
+
+    for reg_an in region_analyses:
+        # Reverse prompt
+        reg_an.reverse = prompt_builder.build(
+            subject_desc=f"{reg_an.label} element",
+            setting_desc="ambient environment",
+            style_desc=reg_an.method,
+            camera_lens=camera_info,
+            lighting_info=lighting_info.model_dump(),
+            color_info=color_grade,
+            aspect_ratio=ingest_res.metadata.aspect_ratio,
+        )
+        # Replication plan
+        reg_an.recreate = rep_planner.plan_region(
+            region=reg_an,
+            aspect_ratio=ingest_res.metadata.aspect_ratio,
+        )
+
+    # Aggregate whole-image verdict
+    aggregator = VerdictAggregator()
+    verdict, change_statement = aggregator.aggregate(
+        regions=region_analyses,
+        global_evidence=global_evidence,
+        aspect_ratio=ingest_res.metadata.aspect_ratio,
+        width=w,
+        height=h,
+        color_grade=color_grade,
+    )
+
+    # Global analysis container
+    global_analysis = GlobalAnalysis(
+        metadata=ingest_res.metadata.model_dump(),
+        provenance={"signals_count": len([e for e in global_evidence if "exif" in e.name or "c2pa" in e.name])},
+        forensics={"noise_profile": camera_info.get("vignette_falloff")},
+        palette=palette,
+        composition=composition.model_dump(),
+        lighting=lighting_info.model_dump(),
+        color_grade=color_grade,
+    )
+
+    limitations = [
+        "Classification is based on measurable digital forensics and metadata heuristics; not infallible proof.",
+        change_statement,
+        "Heavy platform compression (e.g. social media re-encoding) attenuates high-frequency noise and FFT peaks.",
+        "Ethical use: Intended for structural deconstruction and recreation with authorized assets only.",
+    ]
+
+    report = ReportSchema(
+        image=ingest_res.metadata,
+        verdict=verdict,
+        regions=region_analyses,
+        global_analysis=global_analysis,
+        needs_review=all_needs_review,
+        limitations=limitations,
+    )
+
+    # Stage 7 & 8: Export bundle
+    export_assets_bundle(
+        report=report,
+        segment_regions=seg_regions,
+        base_image=ingest_res.preview,
+        out_dir=out_dir,
+        blender_script=blender_script,
+        svg_scaffold=svg_scaffold,
+        html_scaffold=html_scaffold,
+        shoot_plan_data=shoot_plan_data,
+    )
+
+    export_report_json(report, out_dir / "report.json")
+    generate_report_html(report, out_dir / "report.html")
+
+    # Cache precomputed analysis summary by image SHA-256
+    default_cache.set(ingest_res.metadata.sha256, "verdict_summary", report.verdict.model_dump())
+
+    if agent_review or all_needs_review:
+        from rea_image.report.agent_review import export_agent_review_tasks
+        export_agent_review_tasks(report, out_dir)
+
+    return report
+
+
+def rebuild_html_from_json(out_dir: Path) -> Path:
+    """Rebuild report.html from report.json in existing directory."""
+    json_path = out_dir / "report.json"
+    if not json_path.exists():
+        raise FileNotFoundError(f"report.json not found in {out_dir}")
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Parse through Pydantic
+    report = ReportSchema(**data)
+    html_path = out_dir / "report.html"
+    generate_report_html(report, html_path)
+    return html_path
+
