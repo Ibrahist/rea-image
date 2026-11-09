@@ -40,3 +40,4 @@ def test_vlm_client_missing_key():
     """Verify VLM client reports unavailable if no API key or endpoint configured."""
     client = VLMClient(offline=False, api_key=None, endpoint=None)
     assert client.is_available() is False
+
