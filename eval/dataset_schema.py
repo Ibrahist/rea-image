@@ -36,4 +36,6 @@ class EvalSummary(BaseModel):
     compressed_accuracy_pct: float
     screenshot_accuracy_pct: float
     calibration_bins: List[CalibrationBin] = Field(default_factory=list)
+    is_calibrated: bool = Field(default=True)
+    calibration_errors: List[str] = Field(default_factory=list)
 

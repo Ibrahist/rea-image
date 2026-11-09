@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 from PIL import Image, ImageDraw, PngImagePlugin
 import numpy as np
 
@@ -200,7 +200,36 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
     return items
 
 
-def run_evaluation(dataset_manifest: Path, results_output: Path) -> EvalSummary:
+def check_calibration_tolerance(
+    calib_bins: List[CalibrationBin],
+    tolerance: float = 20.0,
+) -> Tuple[bool, List[str]]:
+    """Verify that empirical accuracy for populated bins doesn't drop below threshold - tolerance."""
+    expected_lower_bounds = {
+        "High (0.80+)": 80.0,
+        "Medium-High (0.65-0.80)": 65.0,
+        "Medium (0.45-0.65)": 45.0,
+        "Low (<0.45)": 0.0,
+    }
+    errors = []
+    for b in calib_bins:
+        if b.sample_count == 0:
+            continue
+        expected_floor = expected_lower_bounds.get(b.bin_name, 0.0)
+        min_allowed = expected_floor - tolerance
+        if b.empirical_accuracy_pct < min_allowed:
+            errors.append(
+                f"Bin '{b.bin_name}' is miscalibrated: empirical accuracy {b.empirical_accuracy_pct:.1f}% "
+                f"is below tolerance floor {min_allowed:.1f}% (expected ~{expected_floor:.1f}%)."
+            )
+    return len(errors) == 0, errors
+
+
+def run_evaluation(
+    dataset_manifest: Path,
+    results_output: Path,
+    calib_tolerance: float = 20.0,
+) -> EvalSummary:
     """Execute evaluation harness on the labeled dataset and write RESULTS.md."""
     if not dataset_manifest.exists():
         manifest_dir = dataset_manifest.parent
@@ -295,6 +324,8 @@ def run_evaluation(dataset_manifest: Path, results_output: Path) -> EvalSummary:
             )
         )
 
+    is_calib, calib_errs = check_calibration_tolerance(calib_bins, tolerance=calib_tolerance)
+
     summary = EvalSummary(
         total_images=len(items),
         tuning_accuracy_pct=round(tuning_acc, 1),
@@ -303,6 +334,8 @@ def run_evaluation(dataset_manifest: Path, results_output: Path) -> EvalSummary:
         compressed_accuracy_pct=round(comp_acc, 1),
         screenshot_accuracy_pct=round(ss_acc, 1),
         calibration_bins=calib_bins,
+        is_calibrated=is_calib,
+        calibration_errors=calib_errs,
     )
 
     # Format RESULTS.md

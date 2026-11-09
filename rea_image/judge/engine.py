@@ -40,25 +40,34 @@ DETECTOR_CATEGORY_WEIGHTS = {
 }
 
 
+# Calibration thresholds derived from benchmark calibration bins
+CALIBRATION_THRESHOLDS = {
+    "high": 0.80,
+    "medium_high": 0.65,
+    "medium": 0.45,
+    "medium_low": 0.30,
+}
+
+
 def compute_confidence_label(score: float, top_supporting: List[EvidenceItem]) -> str:
     """Map numeric calibrated score and supporting signals to human confidence level."""
     # If top supporting includes cryptographically verified C2PA or exact prompt chunk
     has_hard_proof = any(ev.name in ("c2pa_assertion", "ai_generator_metadata") for ev in top_supporting)
     if has_hard_proof:
-        if score >= 0.75:
+        if score >= CALIBRATION_THRESHOLDS["high"]:
             return ConfidenceLevel.HIGH.value
-        elif score >= 0.50:
+        elif score >= CALIBRATION_THRESHOLDS["medium"]:
             return ConfidenceLevel.MEDIUM_HIGH.value
         else:
             return ConfidenceLevel.MEDIUM.value
 
-    if score >= 0.75:
+    if score >= CALIBRATION_THRESHOLDS["high"]:
         return ConfidenceLevel.HIGH.value
-    elif score >= 0.60:
+    elif score >= CALIBRATION_THRESHOLDS["medium_high"]:
         return ConfidenceLevel.MEDIUM_HIGH.value
-    elif score >= 0.45:
+    elif score >= CALIBRATION_THRESHOLDS["medium"]:
         return ConfidenceLevel.MEDIUM.value
-    elif score >= 0.30:
+    elif score >= CALIBRATION_THRESHOLDS["medium_low"]:
         return ConfidenceLevel.MEDIUM_LOW.value
     else:
         return ConfidenceLevel.LOW.value

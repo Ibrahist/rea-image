@@ -172,3 +172,35 @@ def test_cli_analyze_formats_and_batch_csv(tmp_path: Path):
     assert "img1.png" in content
     assert "img2.png" in content
 
+
+def test_calibration_tolerance_check():
+    """Test calibration check fails when bins deviate beyond tolerance."""
+    from eval.dataset_schema import CalibrationBin
+    from eval.runner import check_calibration_tolerance
+    from rea_image.judge.engine import compute_confidence_label, CALIBRATION_THRESHOLDS
+    from rea_image.schemas import EvidenceItem
+
+    # Check CALIBRATION_THRESHOLDS are used
+    assert CALIBRATION_THRESHOLDS["high"] == 0.80
+    assert CALIBRATION_THRESHOLDS["medium_high"] == 0.65
+    assert CALIBRATION_THRESHOLDS["medium"] == 0.45
+    label = compute_confidence_label(0.82, [EvidenceItem(name="sensor_poisson_noise", value={}, direction="real photograph", strength=0.8, explanation="noise")])
+    assert label == "high"
+
+    # Calibration bins test
+    good_bins = [
+        CalibrationBin(bin_name="High (0.80+)", confidence_range="0.80+", sample_count=10, correct_count=9, empirical_accuracy_pct=90.0),
+        CalibrationBin(bin_name="Low (<0.45)", confidence_range="<0.45", sample_count=0, correct_count=0, empirical_accuracy_pct=0.0),
+    ]
+    ok, errs = check_calibration_tolerance(good_bins, tolerance=20.0)
+    assert ok
+    assert not errs
+
+    bad_bins = [
+        CalibrationBin(bin_name="High (0.80+)", confidence_range="0.80+", sample_count=10, correct_count=5, empirical_accuracy_pct=50.0),
+    ]
+    ok, errs = check_calibration_tolerance(bad_bins, tolerance=20.0)
+    assert not ok
+    assert len(errs) == 1
+    assert "is below tolerance floor" in errs[0]
+

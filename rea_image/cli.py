@@ -523,6 +523,7 @@ def provenance(
 @app.command(name="eval")
 def eval_dataset(
     dataset: Path = typer.Argument(Path("eval/benchmark_data/dataset.json"), help="Path to evaluation dataset manifest or directory."),
+    tolerance: float = typer.Option(20.0, "--tolerance", "-t", help="Max allowed calibration error tolerance percentage before failing."),
 ):
     """Run the evaluation harness on a labeled dataset."""
     from eval.runner import run_evaluation
@@ -534,7 +535,7 @@ def eval_dataset(
     
     console.print(Panel(f"[bold cyan]Running rea-image Evaluation Harness[/bold cyan]\nDataset: {dataset}\nOutput: {results_path}", expand=False))
     
-    summary = run_evaluation(dataset_manifest=dataset, results_output=results_path)
+    summary = run_evaluation(dataset_manifest=dataset, results_output=results_path, calib_tolerance=tolerance)
     console.print("[bold green]✓ Evaluation Complete![/bold green]")
     console.print(f"  • Total benchmark items: [cyan]{summary.total_images}[/cyan]")
     console.print(f"  • Tuning Set Accuracy: [green]{summary.tuning_accuracy_pct}%[/green]")
@@ -543,6 +544,12 @@ def eval_dataset(
     console.print(f"  • Platform-Compressed Accuracy: [green]{summary.compressed_accuracy_pct}%[/green]")
     console.print(f"  • Screenshot Accuracy: [green]{summary.screenshot_accuracy_pct}%[/green]")
     console.print(f"\nDetailed report written to [bold]{results_path}[/bold]")
+
+    if not summary.is_calibrated:
+        for err in summary.calibration_errors:
+            console.print(f"[bold red]Calibration Error:[/bold red] {err}")
+        console.print(f"[bold red]Evaluation failed:[/bold red] Confidence calibration exceeds {tolerance}% tolerance.")
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
