@@ -1,0 +1,15 @@
+{
+  "name": "rea-image",
+  "version": "0.1.0",
+  "description": "Reverse-engineer any still image: deconstructs production methods, provides forensic evidence, and produces recreation blueprints.",
+  "author": "rea-image authors",
+  "skills": [
+    {
+      "name": "rea-image",
+      "path": "skills/rea-image/SKILL.md",
+      "description": "Analyze and deconstruct still images shot-by-shot or layer-by-layer."
+    }
+  ],
+  "entrypoint": "rea_image.cli:app"
+}
+
