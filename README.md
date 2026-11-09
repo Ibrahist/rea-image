@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo-banner.svg" alt="rea-image banner" width="100%">
+</p>
+
 # rea-image
 
 > Reverse-engineer any still image: deconstruct how it was made, present measurable evidence, and produce a blueprint to recreate it.
