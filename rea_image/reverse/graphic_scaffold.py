@@ -21,7 +21,7 @@ class GraphicScaffoldBuilder:
         svg_lines = [
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="{width}" height="{height}">',
             '  <defs>',
-            f'    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">',
+            '    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">',
             f'      <stop offset="0%" stop-color="{bg_color}" />',
             f'      <stop offset="100%" stop-color="{accent_color}" stop-opacity="0.8" />',
             '    </linearGradient>',

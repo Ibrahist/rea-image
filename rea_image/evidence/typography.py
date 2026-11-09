@@ -1,6 +1,6 @@
 """Typography and layout analysis: font candidates, hierarchy, styling, and grid rhythm."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 import numpy as np
 from rea_image.schemas import TypographyInfo
 

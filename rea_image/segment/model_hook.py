@@ -1,8 +1,7 @@
 """Segmentation orchestrator and model/SAM hook."""
 
-from typing import List, Optional
+from typing import Optional
 import numpy as np
-from rea_image.segment.region import SegmentRegion
 from rea_image.segment.classical import ClassicalSegmenter
 
 

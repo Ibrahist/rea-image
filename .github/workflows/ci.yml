@@ -32,7 +32,7 @@ jobs:
 
       - name: Run Ruff Lint Checks
         run: |
-          ruff check --select F821,F401 rea_image tests
+          ruff check --select F rea_image tests
 
       - name: Run Pytest Test Suite
         run: |

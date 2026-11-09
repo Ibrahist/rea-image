@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from rea_image.ingest.loader import load_image
 from rea_image.segment.model_hook import segment_image
