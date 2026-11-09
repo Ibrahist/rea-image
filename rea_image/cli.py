@@ -26,6 +26,7 @@ def analyze(
     recursive: bool = typer.Option(False, "--recursive", "-r", help="Recursively search directory for images."),
     output_format: str = typer.Option("table", "--format", "-f", help="Output format: table, json, or csv."),
     disable: Optional[List[str]] = typer.Option(None, "--disable", "-d", help="Disable specific detector(s) by name."),
+    jobs: int = typer.Option(1, "--jobs", "-j", help="Number of parallel worker threads for folder analysis (default: 1)."),
 ):
     """Analyze one image or a folder of images to reverse-engineer production methods."""
     import csv
@@ -68,12 +69,9 @@ def analyze(
     if fmt == "table":
         console.print(f"[bold cyan]rea-image analysis[/bold cyan] - processing {len(image_paths)} image(s)...")
 
-    all_reports = []
-    batch_records = []
-    failures = 0
-    for img_path in image_paths:
+    def process_one_image(img_path: Path):
+        target_out = (out / img_path.stem) if (out and len(image_paths) > 1) else out
         try:
-            target_out = (out / img_path.stem) if (out and len(image_paths) > 1) else out
             report = run_analysis_pipeline(
                 image_path=img_path,
                 out_dir=target_out,
@@ -82,9 +80,7 @@ def analyze(
                 agent_review=agent_review,
                 disabled_detectors=disabled_list,
             )
-            all_reports.append(report)
             resolved_dir = target_out or Path(f"./rea_output/{img_path.stem}")
-
             record = {
                 "image": img_path.name,
                 "image_path": str(img_path),
@@ -96,21 +92,9 @@ def analyze(
                 "height": report.image.height,
                 "reports_dir": str(resolved_dir),
             }
-            batch_records.append(record)
-
-            if fmt == "table":
-                console.print(f"\n[bold green]✓ Analysis complete for {img_path.name}[/bold green]")
-                console.print(f"  [bold]Verdict:[/bold] {report.verdict.summary}")
-                console.print(f"  [bold]Reports saved to:[/bold] {resolved_dir}")
-            
-            if open_browser:
-                import webbrowser
-                html_file = resolved_dir / "report.html"
-                if html_file.exists():
-                    webbrowser.open(html_file.resolve().as_uri())
+            return (img_path, report, record, None, resolved_dir)
         except IngestError as e:
-            failures += 1
-            batch_records.append({
+            err_record = {
                 "image": img_path.name,
                 "image_path": str(img_path),
                 "verdict": f"IngestError: {e}",
@@ -120,12 +104,10 @@ def analyze(
                 "width": 0,
                 "height": 0,
                 "reports_dir": "",
-            })
-            if fmt == "table":
-                console.print(f"[bold red]Failed to ingest {img_path.name}:[/bold red] {e}")
+            }
+            return (img_path, None, err_record, e, None)
         except Exception as e:
-            failures += 1
-            batch_records.append({
+            err_record = {
                 "image": img_path.name,
                 "image_path": str(img_path),
                 "verdict": f"Error: {e}",
@@ -135,9 +117,37 @@ def analyze(
                 "width": 0,
                 "height": 0,
                 "reports_dir": "",
-            })
+            }
+            return (img_path, None, err_record, e, None)
+
+    if jobs > 1 and len(image_paths) > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=jobs) as executor:
+            results = list(executor.map(process_one_image, image_paths))
+    else:
+        results = [process_one_image(p) for p in image_paths]
+
+    all_reports = []
+    batch_records = []
+    failures = 0
+
+    for img_path, report, record, err, resolved_dir in results:
+        batch_records.append(record)
+        if report is not None:
+            all_reports.append(report)
             if fmt == "table":
-                console.print(f"[bold red]Pipeline error on {img_path.name}:[/bold red] {e}")
+                console.print(f"\n[bold green]✓ Analysis complete for {img_path.name}[/bold green]")
+                console.print(f"  [bold]Verdict:[/bold] {report.verdict.summary}")
+                console.print(f"  [bold]Reports saved to:[/bold] {resolved_dir}")
+            if open_browser and resolved_dir:
+                import webbrowser
+                html_file = resolved_dir / "report.html"
+                if html_file.exists():
+                    webbrowser.open(html_file.resolve().as_uri())
+        else:
+            failures += 1
+            if fmt == "table":
+                console.print(f"[bold red]Pipeline error on {img_path.name}:[/bold red] {err}")
 
     # Generate batch_summary.csv for directory runs
     if target.is_dir() and batch_records:

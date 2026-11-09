@@ -243,3 +243,20 @@ def test_pluggable_detectors_and_disable_flag(tmp_path: Path):
     assert res_run.exit_code == 0
     assert (out_dir / "report.json").exists()
 
+
+def test_cli_analyze_parallel_jobs(tmp_path: Path):
+    """Test folder analyze using parallel workers (--jobs 2)."""
+    dir_path = tmp_path / "parallel_imgs"
+    dir_path.mkdir()
+    for i in range(3):
+        img = Image.new("RGB", (64, 64), color=(50 * i, 70, 90))
+        img.save(dir_path / f"img_{i}.png")
+
+    out_dir = tmp_path / "parallel_out"
+    res = runner.invoke(app, ["analyze", str(dir_path), "--out", str(out_dir), "--jobs", "2"])
+    assert res.exit_code == 0
+    assert (out_dir / "batch_summary.csv").exists()
+    assert (out_dir / "img_0" / "report.json").exists()
+    assert (out_dir / "img_1" / "report.json").exists()
+    assert (out_dir / "img_2" / "report.json").exists()
+

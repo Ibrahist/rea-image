@@ -40,3 +40,27 @@ def test_vlm_client_missing_key():
     client = VLMClient(offline=False, api_key=None, endpoint=None)
     assert client.is_available() is False
 
+
+def test_orchestrator_cache_plumbing(tmp_path: Path):
+    """Verify that run_analysis_pipeline leverages and populates default_cache."""
+    from rea_image.report.orchestrator import run_analysis_pipeline
+    from rea_image.cache import default_cache
+
+    img_path = tmp_path / "cache_sample.png"
+    img = Image.new("RGB", (80, 80), color=(150, 150, 150))
+    img.save(img_path)
+
+    out1 = tmp_path / "out1"
+    report1 = run_analysis_pipeline(img_path, out_dir=out1)
+    sha256 = report1.image.sha256
+
+    # Verify cached intermediate entries exist
+    cached_craft = default_cache.get(sha256, "craft_analysis")
+    assert cached_craft is not None
+    assert "palette" in cached_craft
+
+    # Re-run pipeline and verify it completes using cache
+    out2 = tmp_path / "out2"
+    report2 = run_analysis_pipeline(img_path, out_dir=out2)
+    assert report2.verdict.summary == report1.verdict.summary
+

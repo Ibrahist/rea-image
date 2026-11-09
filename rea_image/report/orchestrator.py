@@ -33,6 +33,9 @@ from rea_image.schemas import (
     NeedsReviewItem,
     EvidenceItem,
     ProductionMethod,
+    LightingSetupInfo,
+    PaletteColor,
+    CompositionInfo,
 )
 from rea_image.report.json_exporter import export_report_json
 from rea_image.report.html_generator import generate_report_html
@@ -63,46 +66,70 @@ def run_analysis_pipeline(
 
     # Stage 3: Evidence Collection
     detectors = get_active_detectors(disabled=disabled_detectors)
+    sha256 = ingest_res.metadata.sha256
+    disabled_key = "_".join(sorted(disabled_detectors or [])) or "all"
+    cache_ev_key = f"evidence_{disabled_key}"
 
-    global_evidence = []
-    for d in detectors:
-        global_evidence.extend(d.run(ingest_res, seg_regions))
+    cached_ev = default_cache.get(sha256, cache_ev_key)
+    if cached_ev is not None:
+        global_evidence = [EvidenceItem(**item) for item in cached_ev]
+    else:
+        global_evidence = []
+        for d in detectors:
+            global_evidence.extend(d.run(ingest_res, seg_regions))
 
-    # Optional VLM Semantic Sanity Checks (Opt-in only when online)
-    if not offline or vlm_model:
-        vlm_client = VLMClient(model=vlm_model, offline=offline)
-        if vlm_client.is_available():
-            vlm_res = vlm_client.analyze_visual_semantics(ingest_res.preview)
-            if vlm_res:
-                if vlm_res.get("anatomy_flaws"):
-                    global_evidence.append(
-                        EvidenceItem(
-                            name="vlm_anatomy_anomalies",
-                            value=vlm_res,
-                            region="global",
-                            direction=ProductionMethod.AI_GENERATED.value,
-                            strength=0.88,
-                            explanation="VLM detected anatomical flaws (malformed hands, asymmetric eyes, or extra digits).",
+        # Optional VLM Semantic Sanity Checks (Opt-in only when online)
+        if not offline or vlm_model:
+            vlm_client = VLMClient(model=vlm_model, offline=offline)
+            if vlm_client.is_available():
+                vlm_res = vlm_client.analyze_visual_semantics(ingest_res.preview)
+                if vlm_res:
+                    if vlm_res.get("anatomy_flaws"):
+                        global_evidence.append(
+                            EvidenceItem(
+                                name="vlm_anatomy_anomalies",
+                                value=vlm_res,
+                                region="global",
+                                direction=ProductionMethod.AI_GENERATED.value,
+                                strength=0.88,
+                                explanation="VLM detected anatomical flaws (malformed hands, asymmetric eyes, or extra digits).",
+                            )
                         )
-                    )
-                if vlm_res.get("text_gibberish"):
-                    global_evidence.append(
-                        EvidenceItem(
-                            name="vlm_pseudo_text_detected",
-                            value=vlm_res,
-                            region="global",
-                            direction=ProductionMethod.AI_GENERATED.value,
-                            strength=0.85,
-                            explanation="VLM identified pseudo-character glyphs or corrupted background signage.",
+                    if vlm_res.get("text_gibberish"):
+                        global_evidence.append(
+                            EvidenceItem(
+                                name="vlm_pseudo_text_detected",
+                                value=vlm_res,
+                                region="global",
+                                direction=ProductionMethod.AI_GENERATED.value,
+                                strength=0.85,
+                                explanation="VLM identified pseudo-character glyphs or corrupted background signage.",
+                            )
                         )
-                    )
+        default_cache.set(sha256, cache_ev_key, [it.model_dump() for it in global_evidence])
 
     # Stage 3.D/E: Craft & Typography
-    camera_info = CameraCraftEstimator().estimate(arr, seg_regions)
-    lighting_info = LightingClassifier().classify(arr)
-    palette = extract_dominant_palette(arr, n_colors=6)
-    color_grade = analyze_color_grade(arr)
-    composition = analyze_composition(arr, seg_regions)
+    cached_craft = default_cache.get(sha256, "craft_analysis")
+    if cached_craft is not None:
+        camera_info = cached_craft["camera_info"]
+        lighting_info = LightingSetupInfo(**cached_craft["lighting_info"])
+        palette = [PaletteColor(**p) for p in cached_craft["palette"]]
+        color_grade = cached_craft["color_grade"]
+        composition = CompositionInfo(**cached_craft["composition"])
+    else:
+        camera_info = CameraCraftEstimator().estimate(arr, seg_regions)
+        lighting_info = LightingClassifier().classify(arr)
+        palette = extract_dominant_palette(arr, n_colors=6)
+        color_grade = analyze_color_grade(arr)
+        composition = analyze_composition(arr, seg_regions)
+        default_cache.set(sha256, "craft_analysis", {
+            "camera_info": camera_info,
+            "lighting_info": lighting_info.model_dump(),
+            "palette": [p.model_dump() for p in palette],
+            "color_grade": color_grade,
+            "composition": composition.model_dump(),
+        })
+
     typography = TypographyAnalyzer().analyze(arr, text_boxes=confirmed_text_boxes)
     layout_grid = analyze_layout_grid(arr, seg_regions)
 
