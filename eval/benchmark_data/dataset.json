@@ -1,0 +1,92 @@
+[
+  {
+    "id": "ai_tuning_orig",
+    "image_path": "eval\\benchmark_data\\images\\ai_original.png",
+    "split": "tuning",
+    "condition": "original",
+    "expected_dominant_method": "AI-generated",
+    "expected_regions": [
+      {
+        "id": "r0",
+        "expected_method": "AI-generated",
+        "area_pct": 100.0,
+        "bbox": null
+      }
+    ]
+  },
+  {
+    "id": "ai_tuning_comp",
+    "image_path": "eval\\benchmark_data\\images\\ai_compressed.jpg",
+    "split": "tuning",
+    "condition": "compressed",
+    "expected_dominant_method": "AI-generated",
+    "expected_regions": [
+      {
+        "id": "r0",
+        "expected_method": "AI-generated",
+        "area_pct": 100.0,
+        "bbox": null
+      }
+    ]
+  },
+  {
+    "id": "graphic_tuning_orig",
+    "image_path": "eval\\benchmark_data\\images\\graphic_original.png",
+    "split": "tuning",
+    "condition": "original",
+    "expected_dominant_method": "vector or graphic design",
+    "expected_regions": [
+      {
+        "id": "r0",
+        "expected_method": "vector or graphic design",
+        "area_pct": 100.0,
+        "bbox": null
+      }
+    ]
+  },
+  {
+    "id": "graphic_heldout_ss",
+    "image_path": "eval\\benchmark_data\\images\\graphic_screenshot.png",
+    "split": "held_out",
+    "condition": "screenshot",
+    "expected_dominant_method": "vector or graphic design",
+    "expected_regions": [
+      {
+        "id": "r0",
+        "expected_method": "vector or graphic design",
+        "area_pct": 100.0,
+        "bbox": null
+      }
+    ]
+  },
+  {
+    "id": "photo_heldout_orig",
+    "image_path": "eval\\benchmark_data\\images\\photo_heldout_orig.png",
+    "split": "held_out",
+    "condition": "original",
+    "expected_dominant_method": "real photograph",
+    "expected_regions": [
+      {
+        "id": "r0",
+        "expected_method": "real photograph",
+        "area_pct": 100.0,
+        "bbox": null
+      }
+    ]
+  },
+  {
+    "id": "photo_heldout_comp",
+    "image_path": "eval\\benchmark_data\\images\\photo_heldout_comp.jpg",
+    "split": "held_out",
+    "condition": "compressed",
+    "expected_dominant_method": "real photograph",
+    "expected_regions": [
+      {
+        "id": "r0",
+        "expected_method": "real photograph",
+        "area_pct": 100.0,
+        "bbox": null
+      }
+    ]
+  }
+]
