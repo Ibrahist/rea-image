@@ -196,15 +196,71 @@ rea_output/
 
 ---
 
-## Agent Integration (Claude Code, Codex, Antigravity)
+## Agent Integration (Claude Code, Antigravity, Codex)
 
-`rea-image` is packaged as a first-class AI Agent Skill:
-- **Skill definition**: `skills/rea-image/SKILL.md`
-- **Plugin config**: `.claude-plugin/plugin.json`
-- **Agent router**: `AGENTS.md` and `CLAUDE.md`
+`rea-image` is built agent-first. It includes native skill manifests and router instructions so AI coding assistants can install and execute image deconstruction autonomously.
 
-In Claude Code, Codex, or Antigravity, simply say:
-> *"Install rea-image and break down this image: /path/to/photo.png"*
+### 1-Click / 1-Prompt Installation
+
+You can install `rea-image` directly into your agent session using natural language:
+
+```text
+"Install https://github.com/example/rea-image and break down this image: /path/to/image.png"
+```
+
+Or install the package in one command:
+```bash
+# Install in editable mode
+pip install -e .
+
+# Or directly from GitHub
+pip install git+https://github.com/example/rea-image.git
+
+# Or with uv / pipx
+uv pip install -e .
+```
+
+---
+
+### Platform-Specific Setup
+
+#### 1. Claude Code
+`rea-image` provides a standard `.claude-plugin/plugin.json` manifest:
+```bash
+# Add as a local or remote plugin
+claude plugin add ./rea-image
+```
+*Routing:* Claude Code automatically reads `CLAUDE.md` and loads `skills/rea-image/SKILL.md`.
+
+#### 2. Google Antigravity
+The skill is located at `skills/rea-image/SKILL.md` and follows the Antigravity Customization standard.
+- When opening this repository in Antigravity, the skill is automatically active.
+- To use globally across all your workspaces:
+  ```bash
+  # Windows
+  Copy-Item -Recurse skills/rea-image "$env:USERPROFILE\.gemini\antigravity\skills\"
+  
+  # Linux / macOS
+  cp -r skills/rea-image ~/.gemini/antigravity/skills/
+  ```
+
+#### 3. OpenAI Codex & Cursor
+Codex and Cursor automatically index `AGENTS.md` at the project root. When you attach or reference an image in chat, the agent uses the local CLI or Python module directly.
+
+---
+
+### Ready-to-Use Agent Prompts
+
+Copy and paste any of these prompts into your agent chat:
+
+- **Full Deconstruction & Recreate Plan**:
+  > *"Break down this visual: how was it made, what is the evidence, and give me a step-by-step plan to recreate it: `./assets/banner.png`"*
+- **Prompt & Style Reverse-Engineering**:
+  > *"Reverse-engineer the generation prompt, lighting rig, and color grade for this image: `./assets/portrait.jpg`"*
+- **Forensic Verification & Authenticity**:
+  > *"Check whether this photo is authentic or AI-generated. Run digital forensics and inspect C2PA and EXIF data: `./assets/product.png`"*
+- **Agent Visual Review Mode (Resolving Ambiguities)**:
+  > *"Run `rea-image analyze ./assets/ambiguous.png --agent-review`. Inspect the exported region crops in `layers/`, resolve any questions in `needs_review`, and update the final verdict."*
 
 ---
 
