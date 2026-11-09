@@ -155,6 +155,19 @@ def test_cli_analyze_formats_and_batch_csv(tmp_path: Path):
     data = json.loads(res_json.output.strip())
     assert data["image"] == "img1.png"
     assert "verdict" in data
+    assert "regions" in data
+    assert isinstance(data["regions"], list)
+    assert len(data["regions"]) > 0
+    r0 = data["regions"][0]
+    assert "id" in r0
+    assert "label" in r0
+    assert "method" in r0
+    assert "confidence" in r0
+    assert "area_pct" in r0
+    assert "top_evidence" in r0
+    assert isinstance(r0["top_evidence"], list)
+    assert "verdict_breakdown" in data
+    assert isinstance(data["verdict_breakdown"], list)
 
     # 2. CSV format on single image
     res_csv = runner.invoke(app, ["analyze", str(img1_path), "--format", "csv"])

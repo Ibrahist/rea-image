@@ -101,3 +101,28 @@ def test_low_res_degradation_penalty(tmp_path: Path):
     assert deg_item.value["is_degraded"] is True
     assert deg_item.strength > 0.0
 
+
+def test_forensics_small_crop_boundaries():
+    """Test that regional forensics detectors handle crops <64px and <16px without exceptions."""
+    freq_det = ForensicsFrequencyDetector()
+    noise_det = ForensicsNoiseDetector()
+    flat_det = ForensicsFlatDetector()
+
+    # 1. 32x32 crop: frequency detector returns empty (requires >= 64px), noise & flat process safely
+    crop_32 = np.full((32, 32, 3), 120, dtype=np.uint8)
+    freq_items_32 = freq_det.run_region(crop_32, "region_32")
+    assert freq_items_32 == []  # < 64px FFT boundary returns neutral/empty
+
+    noise_items_32 = noise_det.run_region(crop_32, "region_32")
+    assert isinstance(noise_items_32, list)
+
+    flat_items_32 = flat_det.run_region(crop_32, "region_32")
+    assert isinstance(flat_items_32, list)
+
+    # 2. 8x8 micro-crop: below all patch thresholds (<64px, <24px, <16px) -> all return empty
+    crop_8 = np.full((8, 8, 3), 120, dtype=np.uint8)
+    assert freq_det.run_region(crop_8, "region_8") == []
+    assert noise_det.run_region(crop_8, "region_8") == []
+    assert flat_det.run_region(crop_8, "region_8") == []
+
+

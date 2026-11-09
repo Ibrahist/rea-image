@@ -95,6 +95,22 @@ def analyze(
                 no_cache=no_cache,
             )
             resolved_dir = target_out or Path(f"./rea_output/{img_path.stem}")
+            regions_data = []
+            for r in report.regions:
+                sorted_ev = sorted(r.evidence, key=lambda x: x.strength, reverse=True)
+                top_ev = [sorted_ev[0].name, sorted_ev[0].strength, sorted_ev[0].direction] if sorted_ev else []
+                regions_data.append({
+                    "id": r.id,
+                    "label": r.label,
+                    "method": r.method,
+                    "confidence": r.confidence,
+                    "area_pct": r.area_pct,
+                    "top_evidence": top_ev,
+                })
+            verdict_breakdown = [
+                {"method": m.method, "area_pct": m.area_pct}
+                for m in report.verdict.method_breakdown
+            ]
             record = {
                 "image": img_path.name,
                 "image_path": str(img_path),
@@ -105,6 +121,8 @@ def analyze(
                 "width": report.image.width,
                 "height": report.image.height,
                 "reports_dir": str(resolved_dir),
+                "regions": regions_data,
+                "verdict_breakdown": verdict_breakdown,
             }
             return (img_path, report, record, None, resolved_dir)
         except IngestError as e:
@@ -118,6 +136,8 @@ def analyze(
                 "width": 0,
                 "height": 0,
                 "reports_dir": "",
+                "regions": [],
+                "verdict_breakdown": [],
             }
             return (img_path, None, err_record, e, None)
         except Exception as e:
@@ -131,10 +151,18 @@ def analyze(
                 "width": 0,
                 "height": 0,
                 "reports_dir": "",
+                "regions": [],
+                "verdict_breakdown": [],
             }
             return (img_path, None, err_record, e, None)
 
     if jobs > 1 and len(image_paths) > 1:
+        # Concurrency: Use ThreadPoolExecutor instead of ProcessPoolExecutor.
+        # 1. Forensic compute bottlenecks (NumPy FFT, SciPy median filter, PIL decoding)
+        #    release Python's GIL in C extensions, providing near-linear multi-core scaling.
+        # 2. Avoids multiprocessing Windows spawn overhead, module re-import latency,
+        #    and IPC pickle serialization constraints.
+        # 3. PipelineCache disk writes are atomic (temp-file + os.replace), ensuring thread safety.
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=jobs) as executor:
             results = list(executor.map(process_one_image, image_paths))

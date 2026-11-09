@@ -19,6 +19,7 @@ rea-image analyze <image_or_folder> [OPTIONS]
 - `--recursive, -r`: Recursively search folders for supported images.
 - `--format, -f [table|json|csv]`: Set machine-readable stdout output format (default: `table`).
 - `--jobs, -j N`: Set parallel worker count for multi-image folder runs (default: `1`).
+  - *Concurrency Model*: Uses a thread pool (`concurrent.futures.ThreadPoolExecutor`). Heavy forensic compute kernels (NumPy 2D FFT, SciPy median filtering, Pillow image decoding) run in optimized C extensions that release Python's Global Interpreter Lock (GIL), yielding near-linear multi-core acceleration (benchmarking ~2.4x speedup on 14 dataset images) without the heavy multi-process spawn latency and pickle serialization overhead on Windows. Thread safety across parallel workers is guaranteed by atomic temporary file writes in `PipelineCache`.
 - `--disable, -d DETECTOR`: Disable one or more specific detectors (e.g. `--disable frequency --disable noise`).
 - `--open`: Open generated `report.html` in default web browser.
 

@@ -5,8 +5,9 @@ While `rea-image` combines hard cryptographic provenance, statistical frequency 
 ---
 
 ## 1. Pixel Scale and Patch Size Limits
-- **Patches under 64×64 pixels**: Forensic frequency falloff ($\alpha$), 2D FFT spectral peak detection, and DCT $8\times 8$ grid alignment require adequate spatial support. Segments or crops smaller than $64\times 64$ pixels lack the statistical sample size for reliable estimation; such regions fallback to flat run or visual heuristic priors.
-- **Micro-crops under 16×16 pixels**: Cannot be reliably classified by local forensics alone and inherit parent or global provenance properties.
+- **Patches under 64×64 pixels**: Forensic frequency falloff ($\alpha$), 2D FFT spectral peak detection, and DCT $8\times 8$ grid alignment require adequate spatial support. `ForensicsFrequencyDetector.run_region` requires minimum dimensions $\ge 64$px; smaller crops return empty evidence and fallback to regional flat-run and noise estimation.
+- **Patches under 32×32 and 24×24 pixels**: Residual noise estimation requires a minimum patch size of $32\times 32$px globally and $24\times 24$px regionally (`ForensicsNoiseDetector.run_region`). Crops smaller than $24$px return empty noise evidence.
+- **Micro-crops under 16×16 pixels**: Cannot be reliably classified by local forensics alone. `ForensicsFlatDetector.run_region` enforces a $16\times 16$px lower bound. Micro-crops return empty regional evidence and inherit parent or global provenance properties.
 
 ---
 
