@@ -554,15 +554,18 @@ def provenance(
 @app.command(name="eval")
 def eval_dataset(
     dataset: Path = typer.Argument(Path("eval/benchmark_data/dataset.json"), help="Path to evaluation dataset manifest or directory."),
+    results: Optional[Path] = typer.Option(None, "--results", "-r", help="Path to write RESULTS.md (defaults to a temporary file unless specified)."),
     tolerance: float = typer.Option(20.0, "--tolerance", "-t", help="Max allowed calibration error tolerance percentage before failing."),
+    min_accuracy: Optional[float] = typer.Option(None, "--min-accuracy", "-m", help="Minimum required overall accuracy percentage to pass."),
 ):
     """Run the evaluation harness on a labeled dataset."""
+    import tempfile
     from eval.runner import run_evaluation
     
-    if dataset.suffix.lower() == ".json":
-        results_path = dataset.parent.parent / "RESULTS.md"
+    if results is not None:
+        results_path = results
     else:
-        results_path = dataset / "RESULTS.md"
+        results_path = Path(tempfile.gettempdir()) / "rea_image_eval_results.md"
     
     console.print(Panel(f"[bold cyan]Running rea-image Evaluation Harness[/bold cyan]\nDataset: {dataset}\nOutput: {results_path}", expand=False))
     
@@ -580,6 +583,11 @@ def eval_dataset(
         for err in summary.calibration_errors:
             console.print(f"[bold red]Calibration Error:[/bold red] {err}")
         console.print(f"[bold red]Evaluation failed:[/bold red] Confidence calibration exceeds {tolerance}% tolerance.")
+        raise typer.Exit(code=1)
+
+    overall_acc = (summary.tuning_accuracy_pct + summary.held_out_accuracy_pct) / 2.0
+    if min_accuracy is not None and overall_acc < min_accuracy:
+        console.print(f"[bold red]Evaluation failed:[/bold red] Overall accuracy {overall_acc:.1f}% is below required minimum {min_accuracy:.1f}%.")
         raise typer.Exit(code=1)
 
 

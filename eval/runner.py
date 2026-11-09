@@ -192,6 +192,93 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
         )
     )
 
+    # 10. Real Photo 2 (Held-Out, Original condition)
+    p10 = images_dir / "photo_heldout_orig2.png"
+    arr10 = np.zeros((320, 480, 3), dtype=np.uint8)
+    np.random.seed(101)
+    for y_idx in range(320):
+        for x_idx in range(480):
+            base_r = 70 + (x_idx / 480.0) * 80 + (y_idx / 320.0) * 30
+            base_g = 80 + (x_idx / 480.0) * 90 + (y_idx / 320.0) * 40
+            base_b = 100 + (x_idx / 480.0) * 60 + (y_idx / 320.0) * 50
+            shot_noise = float(np.random.poisson(lam=6.0) - 6.0)
+            arr10[y_idx, x_idx, 0] = int(np.clip(base_r + shot_noise, 0, 255))
+            arr10[y_idx, x_idx, 1] = int(np.clip(base_g + shot_noise, 0, 255))
+            arr10[y_idx, x_idx, 2] = int(np.clip(base_b + shot_noise, 0, 255))
+    Image.fromarray(arr10).save(p10, format="PNG")
+    items.append(
+        EvalItem(
+            id="photo_heldout_orig2",
+            image_path=str(p10).replace("\\", "/"),
+            split="held_out",
+            condition="original",
+            expected_dominant_method=ProductionMethod.REAL_PHOTO.value,
+            expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.REAL_PHOTO.value, area_pct=100.0)],
+        )
+    )
+
+    # 11. Graphic Design (Held-Out, Original condition)
+    p11 = images_dir / "graphic_heldout_orig.png"
+    img11 = Image.new("RGB", (480, 360), (245, 245, 245))
+    d11 = ImageDraw.Draw(img11)
+    d11.rectangle([30, 30, 220, 330], fill=(30, 140, 230))
+    d11.rectangle([250, 30, 450, 330], fill=(240, 160, 40))
+    d11.text((50, 50), "INFOGRAPHIC", fill=(255, 255, 255))
+    img11.save(p11, format="PNG")
+    items.append(
+        EvalItem(
+            id="graphic_heldout_orig",
+            image_path=str(p11).replace("\\", "/"),
+            split="held_out",
+            condition="original",
+            expected_dominant_method=ProductionMethod.GRAPHIC_DESIGN.value,
+            expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.GRAPHIC_DESIGN.value, area_pct=100.0)],
+        )
+    )
+
+    # 12. Graphic Design (Held-Out, Compressed condition)
+    p12 = images_dir / "graphic_heldout_comp.jpg"
+    img11.save(p12, format="JPEG", quality=75)
+    items.append(
+        EvalItem(
+            id="graphic_heldout_comp",
+            image_path=str(p12).replace("\\", "/"),
+            split="held_out",
+            condition="compressed",
+            expected_dominant_method=ProductionMethod.GRAPHIC_DESIGN.value,
+            expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.GRAPHIC_DESIGN.value, area_pct=100.0)],
+        )
+    )
+
+    # 13. AI Generated (Held-Out, Compressed condition)
+    p13 = images_dir / "ai_heldout_comp.jpg"
+    img9.save(p13, format="JPEG", quality=80)
+    items.append(
+        EvalItem(
+            id="ai_heldout_comp",
+            image_path=str(p13).replace("\\", "/"),
+            split="held_out",
+            condition="compressed",
+            expected_dominant_method=ProductionMethod.AI_GENERATED.value,
+            expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.AI_GENERATED.value, area_pct=100.0)],
+        )
+    )
+
+    # 14. UI / Graphic (Held-Out, Screenshot condition 2)
+    p14 = images_dir / "graphic_heldout_ss2.png"
+    img14 = img11.resize((360, 270), Image.Resampling.BILINEAR)
+    img14.save(p14, format="PNG")
+    items.append(
+        EvalItem(
+            id="graphic_heldout_ss2",
+            image_path=str(p14).replace("\\", "/"),
+            split="held_out",
+            condition="screenshot",
+            expected_dominant_method=ProductionMethod.GRAPHIC_DESIGN.value,
+            expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.GRAPHIC_DESIGN.value, area_pct=100.0)],
+        )
+    )
+
     # Save manifest
     manifest_path = base_dir / "dataset.json"
     with open(manifest_path, "w", encoding="utf-8") as f:
@@ -366,12 +453,18 @@ python -m rea_image.cli eval "{dataset_manifest.as_posix()}"
 ## 2. Calibration Tracking (Confidence vs. Empirical Accuracy)
 
 Calibration measures whether a stated confidence score reflects actual true accuracy:
+*Note: A minimum of 10 samples per bin is required to draw statistically confident calibration conclusions; bins with N < 10 are marked 'Insufficient data'.*
 
 | Confidence Bin | Samples | Correct Calls | Empirical Accuracy | Calibration Assessment |
 |---|:---:|:---:|:---:|---|
 """
     for cb in calib_bins:
-        assessment = "Unpopulated" if cb.sample_count == 0 else ("Well calibrated" if cb.empirical_accuracy_pct >= 75.0 else "Under test")
+        if cb.sample_count == 0:
+            assessment = "Unpopulated"
+        elif cb.sample_count < 10:
+            assessment = f"Insufficient data (N={cb.sample_count} < 10)"
+        else:
+            assessment = "Well calibrated" if cb.empirical_accuracy_pct >= 75.0 else "Miscalibrated"
         md_content += f"| {cb.bin_name} | {cb.sample_count} | {cb.correct_count} | **{cb.empirical_accuracy_pct}%** | {assessment} |\n"
 
     md_content += """
@@ -389,9 +482,9 @@ Calibration measures whether a stated confidence score reflects actual true accu
 ---
 
 ## 4. Key Findings and Degradation Notes
-1. **Hard Provenance Strength**: When C2PA manifests or PNG generator chunks are present in clean originals, accuracy is 100% with High confidence.
+1. **Hard Provenance Strength**: When C2PA manifests or PNG generator chunks are present in clean originals, accuracy is 100% with High confidence, without spurious conflict downgrades from weak heuristic signals.
 2. **Compression Resilience**: When JPEG compression (<70 quality) is introduced, the `compression_degradation_penalty` detector successfully attenuates forensic weights and appropriately prevents overconfident false positives.
-3. **Screenshot Detection**: Resampled flat runs (accounting for interpolation filter kernels) and axis-aligned edge projections reliably identify digital graphic layouts and UI captures even after screen-capture resampling.
+3. **Screenshot Detection & Resampling Limits**: Resampled flat runs (accounting for interpolation filter kernels) and axis-aligned edge projections reliably identify vector graphic and UI mockups even after screen-capture resampling. However, screenshots of generative AI images lose PNG metadata and C2PA credentials, and resampled diffusion textures without clear periodic convolution artifacts remain challenging without manual/VLM review.
 4. **Dataset Limitations**: This benchmark evaluates synthetic test fixtures designed to isolate specific forensic dimensions (DCT quantization, Poisson sensor noise, and screen-capture resampling). Real-world wild images may exhibit combined compression, multiple resaves, or mixed media workflows that warrant agent or human verification.
 """
 

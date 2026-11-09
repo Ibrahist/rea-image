@@ -47,7 +47,11 @@ class ConflictDetector:
         has_noise_composite = any(ev.name in ("noise_inconsistency_composite", "jpeg_grid_misalignment") for ev in evidence_list)
 
         # Conflict 1: Camera EXIF or optical photo signals coexist with AI synthetic indicators
-        if has_photo_signals and has_ai_signals:
+        has_hard_ai = any(ev.name in ("ai_generator_metadata", "c2pa_assertion") for ev in ai_signals)
+        # If hard AI metadata is verified, only hard camera EXIF can genuinely contradict it
+        should_flag_photo_ai_conflict = (has_camera_exif or not has_hard_ai) if has_photo_signals else False
+
+        if should_flag_photo_ai_conflict and has_ai_signals:
             photo_names = ", ".join(ev.name for ev in photo_signals)
             ai_names = ", ".join(ev.name for ev in ai_signals)
             msg = f"Conflict: Real photograph signals ({photo_names}) coexist with AI synthetic indicators ({ai_names})."

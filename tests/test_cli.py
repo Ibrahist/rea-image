@@ -288,3 +288,18 @@ def test_cli_analyze_no_cache_flag(tmp_path: Path):
     assert res.exit_code == 0
     assert (out_dir / "report.json").exists()
 
+
+def test_cli_eval_temp_results_and_min_accuracy():
+    """Test eval command temp output default and --min-accuracy gating."""
+    # 1. Without --results, writes to temp dir
+    res = runner.invoke(app, ["eval", "eval/benchmark_data/dataset.json", "--min-accuracy", "50.0"])
+    assert res.exit_code == 0
+    assert "Evaluation Complete!" in res.output
+    assert "Detailed report written to" in res.output
+
+    # 2. Failing --min-accuracy
+    res_fail = runner.invoke(app, ["eval", "eval/benchmark_data/dataset.json", "--min-accuracy", "99.9"])
+    assert res_fail.exit_code == 1
+    assert "Evaluation failed" in res_fail.output
+    assert "is below required minimum" in res_fail.output
+

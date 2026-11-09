@@ -50,7 +50,8 @@ class VerdictAggregator:
             ai_style = f"{style_info['family']}; "
 
         # Check if contradictions or conflict items exist across regions
-        has_conflicts = any(r.contradictions for r in regions)
+        has_hard_proof = any(ev.name in ("c2pa_assertion", "ai_generator_metadata") for ev in global_evidence)
+        has_conflicts = any(r.contradictions for r in regions) and not has_hard_proof
         conf_label = regions[0].confidence if regions else "medium"
         if has_conflicts and conf_label in ("high", "medium-high"):
             conf_label = "medium"

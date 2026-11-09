@@ -54,9 +54,9 @@ def compute_confidence_label(score: float, top_supporting: List[EvidenceItem]) -
     # If top supporting includes cryptographically verified C2PA or exact prompt chunk
     has_hard_proof = any(ev.name in ("c2pa_assertion", "ai_generator_metadata") for ev in top_supporting)
     if has_hard_proof:
-        if score >= CALIBRATION_THRESHOLDS["high"]:
+        if score >= 0.70:
             return ConfidenceLevel.HIGH.value
-        elif score >= CALIBRATION_THRESHOLDS["medium"]:
+        elif score >= 0.45:
             return ConfidenceLevel.MEDIUM_HIGH.value
         else:
             return ConfidenceLevel.MEDIUM.value
