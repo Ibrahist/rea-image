@@ -7,16 +7,19 @@ from rea_image.judge.conflict import ConflictDetector
 
 # Category multipliers: Hard provenance > Forensics > Visuals
 DETECTOR_CATEGORY_WEIGHTS = {
-    # Hard Provenance (weight 3.0)
-    "c2pa_assertion": 3.0,
-    "ai_generator_metadata": 3.0,
-    "camera_exif": 2.8,
-    "iptc_digital_source_type": 2.8,
+    # Hard Provenance (weight 4.0 - 5.0)
+    "c2pa_assertion": 5.0,
+    "ai_generator_metadata": 5.0,
+    "camera_exif": 3.5,
+    "iptc_digital_source_type": 3.5,
+    "invisible_watermark": 2.5,
     "rendering_software": 2.5,
     "export_software_signature": 2.0,
     # Forensics (weight 1.8)
     "natural_frequency_falloff": 1.8,
     "flat_color_runs": 1.8,
+    "ui_axis_aligned_edges": 1.8,
+    "resampled_flat_runs": 1.7,
     "jpeg_grid_misalignment": 1.8,
     "noise_inconsistency_composite": 1.8,
     "sensor_poisson_noise": 1.6,
@@ -76,10 +79,23 @@ class JudgmentEngine:
         evidence_list: List[EvidenceItem],
     ) -> Tuple[RegionAnalysis, List[str], list]:
         """Classify a region based on weighted evidence sum."""
-        # Filter evidence applicable to this region: global evidence + region-specific evidence
+        # Filter evidence applicable to this region:
+        # File-level provenance applies globally, but whole-image pixel heuristics
+        # should not pollute regions that have their own localized forensic measurements.
+        has_local_evidence = any(ev.region == region_id for ev in evidence_list)
+        global_pixel_heuristics = {
+            "flat_color_runs",
+            "resampled_flat_runs",
+            "ui_axis_aligned_edges",
+            "noise_residual_hypersmooth",
+            "excess_high_frequency_energy",
+            "continuous_natural_gradients",
+        }
+
         applicable_evidence = [
             ev for ev in evidence_list
-            if ev.region in ("global", region_id)
+            if ev.region == region_id
+            or (ev.region == "global" and (not has_local_evidence or ev.name not in global_pixel_heuristics))
         ]
 
         # Initialize scores for all production methods

@@ -77,10 +77,7 @@ class ClassicalSegmenter:
 
         # Background mask
         bg_mask = (color_idx == bg_color) & (~assigned_mask)
-        # Also clean up morphological holes in background
-        from scipy.ndimage import binary_dilation, binary_erosion
-        bg_cleaned = binary_dilation(bg_mask, iterations=2)
-        bg_cleaned = binary_erosion(bg_cleaned, iterations=2) & (~assigned_mask)
+        bg_cleaned = bg_mask.copy()
         
         bg_area = int(np.sum(bg_cleaned))
         if bg_area > total_pixels * 0.05:
@@ -149,8 +146,13 @@ class ClassicalSegmenter:
                 bg_region.mask |= leftover_mask
                 new_area = int(np.sum(bg_region.mask))
                 bg_region.area_pct = round((new_area / float(total_pixels)) * 100.0, 2)
-                ys, xs = np.where(bg_region.mask)
-                bg_region.bbox = [int(np.min(xs)), int(np.min(ys)), int(np.max(xs) - np.min(xs) + 1), int(np.max(ys) - np.min(ys) + 1)]
+                # Compute bbox of the largest connected component of background to avoid isolated noise outliers
+                lbl, num = label(bg_region.mask)
+                if num > 0:
+                    counts = np.bincount(lbl.ravel())[1:]
+                    largest_comp = int(np.argmax(counts)) + 1
+                    ys, xs = np.where(lbl == largest_comp)
+                    bg_region.bbox = [int(np.min(xs)), int(np.min(ys)), int(np.max(xs) - np.min(xs) + 1), int(np.max(ys) - np.min(ys) + 1)]
             else:
                 ys, xs = np.where(leftover_mask)
                 bx, by = int(np.min(xs)), int(np.min(ys))

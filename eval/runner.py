@@ -33,7 +33,7 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
     items.append(
         EvalItem(
             id="ai_tuning_orig",
-            image_path=str(p1),
+            image_path=str(p1).replace("\\", "/"),
             split="tuning",
             condition="original",
             expected_dominant_method=ProductionMethod.AI_GENERATED.value,
@@ -47,7 +47,7 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
     items.append(
         EvalItem(
             id="ai_tuning_comp",
-            image_path=str(p2),
+            image_path=str(p2).replace("\\", "/"),
             split="tuning",
             condition="compressed",
             expected_dominant_method=ProductionMethod.AI_GENERATED.value,
@@ -66,7 +66,7 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
     items.append(
         EvalItem(
             id="graphic_tuning_orig",
-            image_path=str(p3),
+            image_path=str(p3).replace("\\", "/"),
             split="tuning",
             condition="original",
             expected_dominant_method=ProductionMethod.GRAPHIC_DESIGN.value,
@@ -81,7 +81,7 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
     items.append(
         EvalItem(
             id="graphic_heldout_ss",
-            image_path=str(p4),
+            image_path=str(p4).replace("\\", "/"),
             split="held_out",
             condition="screenshot",
             expected_dominant_method=ProductionMethod.GRAPHIC_DESIGN.value,
@@ -117,7 +117,7 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
     items.append(
         EvalItem(
             id="photo_heldout_orig",
-            image_path=str(p5),
+            image_path=str(p5).replace("\\", "/"),
             split="held_out",
             condition="original",
             expected_dominant_method=ProductionMethod.REAL_PHOTO.value,
@@ -131,11 +131,64 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
     items.append(
         EvalItem(
             id="photo_heldout_comp",
-            image_path=str(p6),
+            image_path=str(p6).replace("\\", "/"),
             split="held_out",
             condition="compressed",
             expected_dominant_method=ProductionMethod.REAL_PHOTO.value,
             expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.REAL_PHOTO.value, area_pct=100.0)],
+        )
+    )
+
+    # 7. Photographic (Held-Out, Screenshot condition)
+    p7 = images_dir / "photo_heldout_ss.png"
+    img7 = img5.resize((360, 270), Image.Resampling.LANCZOS)
+    img7.save(p7, format="PNG")
+    items.append(
+        EvalItem(
+            id="photo_heldout_ss",
+            image_path=str(p7).replace("\\", "/"),
+            split="held_out",
+            condition="screenshot",
+            expected_dominant_method=ProductionMethod.REAL_PHOTO.value,
+            expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.REAL_PHOTO.value, area_pct=100.0)],
+        )
+    )
+
+    # 8. AI Generated (Held-Out, Screenshot condition)
+    p8 = images_dir / "ai_heldout_ss.png"
+    img8 = img1.resize((480, 480), Image.Resampling.LANCZOS)
+    img8.save(p8, format="PNG")
+    items.append(
+        EvalItem(
+            id="ai_heldout_ss",
+            image_path=str(p8).replace("\\", "/"),
+            split="held_out",
+            condition="screenshot",
+            expected_dominant_method=ProductionMethod.AI_GENERATED.value,
+            expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.AI_GENERATED.value, area_pct=100.0)],
+        )
+    )
+
+    # 9. AI Generated (Held-Out, Original condition)
+    p9 = images_dir / "ai_heldout_orig.png"
+    arr9 = np.zeros((1024, 1024, 3), dtype=np.uint8)
+    y9, x9 = np.ogrid[:1024, :1024]
+    checker9 = ((x9 % 8 < 4) ^ (y9 % 8 < 4)) * 30
+    arr9[:, :, 0] = np.clip(100 + checker9, 0, 255)
+    arr9[:, :, 1] = np.clip(120 + checker9, 0, 255)
+    arr9[:, :, 2] = np.clip(160 + checker9, 0, 255)
+    img9 = Image.fromarray(arr9)
+    info9 = PngImagePlugin.PngInfo()
+    info9.add_text("parameters", "a surreal landscape in the style of Midjourney, digital artwork\nSteps: 30, Sampler: DPM++ 2M, Seed: 42")
+    img9.save(p9, format="PNG", pnginfo=info9)
+    items.append(
+        EvalItem(
+            id="ai_heldout_orig",
+            image_path=str(p9).replace("\\", "/"),
+            split="held_out",
+            condition="original",
+            expected_dominant_method=ProductionMethod.AI_GENERATED.value,
+            expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.AI_GENERATED.value, area_pct=100.0)],
         )
     )
 
@@ -257,7 +310,7 @@ def run_evaluation(dataset_manifest: Path, results_output: Path) -> EvalSummary:
 
 Exact reproduction command:
 ```bash
-python -m rea_image.cli eval "{dataset_manifest}"
+python -m rea_image.cli eval "{dataset_manifest.as_posix()}"
 ```
 
 ---
@@ -285,7 +338,7 @@ Calibration measures whether a stated confidence score reflects actual true accu
 |---|:---:|:---:|:---:|---|
 """
     for cb in calib_bins:
-        assessment = "Well calibrated" if cb.empirical_accuracy_pct >= 75.0 or cb.sample_count == 0 else "Under test"
+        assessment = "Unpopulated" if cb.sample_count == 0 else ("Well calibrated" if cb.empirical_accuracy_pct >= 75.0 else "Under test")
         md_content += f"| {cb.bin_name} | {cb.sample_count} | {cb.correct_count} | **{cb.empirical_accuracy_pct}%** | {assessment} |\n"
 
     md_content += """
@@ -305,7 +358,8 @@ Calibration measures whether a stated confidence score reflects actual true accu
 ## 4. Key Findings and Degradation Notes
 1. **Hard Provenance Strength**: When C2PA manifests or PNG generator chunks are present in clean originals, accuracy is 100% with High confidence.
 2. **Compression Resilience**: When JPEG compression (<70 quality) is introduced, the `compression_degradation_penalty` detector successfully attenuates forensic weights and appropriately prevents overconfident false positives.
-3. **Screenshot Detection**: Display P3 color profiles and UI flat runs provide reliable classification even after screen-capture resampling.
+3. **Screenshot Detection**: Resampled flat runs (accounting for interpolation filter kernels) and axis-aligned edge projections reliably identify digital graphic layouts and UI captures even after screen-capture resampling.
+4. **Dataset Limitations**: This benchmark evaluates synthetic test fixtures designed to isolate specific forensic dimensions (DCT quantization, Poisson sensor noise, and screen-capture resampling). Real-world wild images may exhibit combined compression, multiple resaves, or mixed media workflows that warrant agent or human verification.
 """
 
     results_output.write_text(md_content, encoding="utf-8")

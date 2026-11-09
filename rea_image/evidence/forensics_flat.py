@@ -32,10 +32,17 @@ class ForensicsFlatDetector(BaseDetector):
         # 1. Flat Region & Exact Color Run Analysis (Vector vs Photo test)
         flat_stats = self._analyze_flat_runs(arr)
         flat_pct = flat_stats["flat_pixel_percentage"]
+        near_flat_pct = flat_stats.get("near_flat_percentage", 0.0)
         unique_ratio = flat_stats["unique_color_ratio"]
         unique_colors = flat_stats.get("unique_colors_sampled", 9999)
 
-        is_vector = (flat_pct > 35.0 and unique_ratio < 0.03) or (flat_pct > 15.0 and unique_ratio < 0.01) or (unique_colors < 256)
+        axis_edges = self._analyze_axis_aligned_edges(arr)
+        is_vector = (
+            (flat_pct > 35.0 and unique_ratio < 0.03)
+            or (flat_pct > 15.0 and unique_ratio < 0.01)
+            or (unique_colors < 256)
+            or (axis_edges["is_axis_aligned"] and near_flat_pct > 35.0 and unique_ratio < 0.03)
+        )
         if is_vector:
             items.append(
                 make_evidence(
@@ -43,7 +50,27 @@ class ForensicsFlatDetector(BaseDetector):
                     value=flat_stats,
                     direction=ProductionMethod.GRAPHIC_DESIGN.value,
                     strength=0.85,
-                    explanation=f"High proportion of exact flat color runs ({flat_pct:.1f}% flat pixels) and low unique color entropy; characteristic of vector design, infographic, or UI.",
+                    explanation=f"High proportion of flat color runs ({flat_pct:.1f}% flat pixels) and low unique color entropy; characteristic of vector design, infographic, or UI.",
+                )
+            )
+            if axis_edges["is_axis_aligned"]:
+                items.append(
+                    make_evidence(
+                        name="ui_axis_aligned_edges",
+                        value=axis_edges,
+                        direction=ProductionMethod.GRAPHIC_DESIGN.value,
+                        strength=0.85,
+                        explanation=f"High proportion of axis-aligned edges ({axis_edges['axis_aligned_ratio']*100:.1f}%) and flat runs; characteristic of UI screenshots or vector layouts.",
+                    )
+                )
+        elif near_flat_pct > 40.0 and unique_ratio < 0.08:
+            items.append(
+                make_evidence(
+                    name="resampled_flat_runs",
+                    value={"near_flat_pct": near_flat_pct, "unique_ratio": unique_ratio},
+                    direction=ProductionMethod.GRAPHIC_DESIGN.value,
+                    strength=0.82,
+                    explanation=f"Resampled flat runs ({near_flat_pct:.1f}% within interpolation threshold) indicating digital screen capture or scaled graphic.",
                 )
             )
         elif unique_ratio > 0.02 or flat_pct < 10.0:
@@ -86,6 +113,30 @@ class ForensicsFlatDetector(BaseDetector):
 
         return items
 
+    def _analyze_axis_aligned_edges(self, arr: np.ndarray) -> Dict[str, Any]:
+        """Detect axis-aligned edges (horizontal and vertical) characteristic of UI screenshots and vector layouts."""
+        h, w, _ = arr.shape
+        if min(h, w) < 32:
+            return {"is_axis_aligned": False, "axis_aligned_ratio": 0.0, "edge_count": 0}
+
+        lum = 0.299 * arr[:, :, 0] + 0.587 * arr[:, :, 1] + 0.114 * arr[:, :, 2]
+        gy, gx = np.gradient(lum)
+        mag = np.hypot(gx, gy)
+        sig_mask = mag > 15.0
+        sig_count = int(np.sum(sig_mask))
+        if sig_count < 60:
+            return {"is_axis_aligned": False, "axis_aligned_ratio": 0.0, "edge_count": sig_count}
+
+        angles = np.rad2deg(np.arctan2(np.abs(gy[sig_mask]), np.abs(gx[sig_mask])))
+        axis_aligned_count = int(np.sum((angles <= 6.0) | (angles >= 84.0)))
+        ratio = axis_aligned_count / float(sig_count)
+
+        return {
+            "is_axis_aligned": ratio > 0.60,
+            "axis_aligned_ratio": float(ratio),
+            "edge_count": sig_count,
+        }
+
     def _analyze_flat_runs(self, arr: np.ndarray) -> Dict[str, float]:
         """Compute horizontal flat runs (consecutive identical RGB pixels)."""
         h, w, _ = arr.shape
@@ -93,11 +144,40 @@ class ForensicsFlatDetector(BaseDetector):
         step_y = max(1, h // 200)
         sampled = arr[::step_y, :, :]
         
-        # Horizontal diff
         diff_h = np.all(sampled[:, 1:, :] == sampled[:, :-1, :], axis=-1)
-        flat_pixels = int(np.sum(diff_h))
+        diff_near = np.all(np.abs(sampled[:, 1:, :].astype(np.int16) - sampled[:, :-1, :].astype(np.int16)) <= 3, axis=-1)
         total_tested = int(diff_h.size)
-        flat_pct = (flat_pixels / (total_tested + 1e-5)) * 100.0
+
+        min_run = max(8, int(w * 0.02))
+        flat_long_count = 0
+        near_flat_long_count = 0
+
+        for row in diff_h:
+            r_len = 0
+            for v in row:
+                if v:
+                    r_len += 1
+                else:
+                    if r_len >= min_run:
+                        flat_long_count += r_len
+                    r_len = 0
+            if r_len >= min_run:
+                flat_long_count += r_len
+
+        for row in diff_near:
+            r_len = 0
+            for v in row:
+                if v:
+                    r_len += 1
+                else:
+                    if r_len >= min_run:
+                        near_flat_long_count += r_len
+                    r_len = 0
+            if r_len >= min_run:
+                near_flat_long_count += r_len
+
+        flat_pct = (flat_long_count / (total_tested + 1e-5)) * 100.0
+        near_flat_pct = (near_flat_long_count / (total_tested + 1e-5)) * 100.0
 
         # Unique colors in sample
         flat_colors = sampled.reshape(-1, 3)
@@ -108,6 +188,7 @@ class ForensicsFlatDetector(BaseDetector):
 
         return {
             "flat_pixel_percentage": float(flat_pct),
+            "near_flat_percentage": float(near_flat_pct),
             "unique_color_ratio": float(unique_ratio),
             "unique_colors_sampled": int(unique_colors),
         }
@@ -152,10 +233,17 @@ class ForensicsFlatDetector(BaseDetector):
 
         flat_stats = self._analyze_flat_runs(crop)
         flat_pct = flat_stats["flat_pixel_percentage"]
+        near_flat_pct = flat_stats.get("near_flat_percentage", 0.0)
         unique_ratio = flat_stats["unique_color_ratio"]
         unique_colors = flat_stats.get("unique_colors_sampled", 9999)
 
-        is_vector = (flat_pct > 35.0 and unique_ratio < 0.03) or (flat_pct > 15.0 and unique_ratio < 0.01) or (unique_colors < 256)
+        axis_edges = self._analyze_axis_aligned_edges(crop)
+        is_vector = (
+            (flat_pct > 35.0 and unique_ratio < 0.03)
+            or (flat_pct > 15.0 and unique_ratio < 0.01)
+            or (unique_colors < 256)
+            or (axis_edges["is_axis_aligned"] and near_flat_pct > 35.0 and unique_ratio < 0.03)
+        )
         if is_vector:
             items.append(
                 make_evidence(
@@ -163,10 +251,21 @@ class ForensicsFlatDetector(BaseDetector):
                     value=flat_stats,
                     direction=ProductionMethod.GRAPHIC_DESIGN.value,
                     strength=0.88,
-                    explanation=f"Region {region_id} contains exact flat color runs ({flat_pct:.1f}% flat) and low color entropy; characteristic of vector design.",
+                    explanation=f"Region {region_id} contains flat color runs ({flat_pct:.1f}% flat) and low color entropy; characteristic of vector design.",
                     region=region_id,
                 )
             )
+            if axis_edges["is_axis_aligned"]:
+                items.append(
+                    make_evidence(
+                        name="ui_axis_aligned_edges",
+                        value=axis_edges,
+                        direction=ProductionMethod.GRAPHIC_DESIGN.value,
+                        strength=0.85,
+                        explanation=f"Region {region_id} shows strong axis-aligned edges ({axis_edges['axis_aligned_ratio']*100:.1f}%) typical of UI or layout.",
+                        region=region_id,
+                    )
+                )
         elif unique_ratio > 0.02 or flat_pct < 10.0:
             items.append(
                 make_evidence(

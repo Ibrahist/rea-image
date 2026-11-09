@@ -179,22 +179,16 @@ def test_tesseract_garbage_output_filtered(monkeypatch):
 
 def test_composite_image_different_methods_per_region(tmp_path):
     """Regression test for A2: A composite image with photo half and flat graphic half must evaluate per-region."""
-    h, w = 400, 400
-    arr = np.zeros((h, w, 3), dtype=np.uint8)
-    
-    # Top half: photo gradient with noise
-    y = np.linspace(100, 220, 200)[:, None]
-    x = np.linspace(50, 180, 400)[None, :]
-    arr[:200, :, 0] = y.astype(np.uint8)
-    arr[:200, :, 1] = ((y + x) / 2).astype(np.uint8)
-    arr[:200, :, 2] = (255 - y).astype(np.uint8)
-    noise = np.random.normal(0, 4, (200, 400, 3)).astype(np.float32)
-    arr[:200] = np.clip(arr[:200].astype(np.float32) + noise, 0, 255).astype(np.uint8)
+    photo_path = tmp_path / "base_photo.jpg"
+    create_outdoor_photo_fixture(photo_path)
+    photo_arr = np.array(Image.open(photo_path))
 
-    # Bottom half: flat vector/graphic design
-    arr[200:, :] = [240, 30, 30]
+    # Top half: photo, Bottom half: flat vector/graphic design
+    comp_arr = np.zeros_like(photo_arr)
+    comp_arr[:300] = photo_arr[:300]
+    comp_arr[300:] = [15, 25, 45]
 
-    img = Image.fromarray(arr)
+    img = Image.fromarray(comp_arr)
     img_path = tmp_path / "composite.png"
     img.save(img_path)
 

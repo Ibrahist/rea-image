@@ -25,19 +25,21 @@ class ForensicsNoiseDetector(BaseDetector):
         # Estimate noise residual using local median filtering
         filtered = median_filter(lum, size=3)
         residual = lum - filtered
+        residual_mag = np.abs(residual)
         
         noise_std = float(np.std(residual))
         noise_var = float(np.var(residual))
+        noise_p75 = float(np.percentile(residual_mag, 75))
 
         # Check for hyper-smoothness (characteristic of graphic design, UI, or heavy AI smoothing)
-        if noise_std < 0.6:
+        if noise_std < 0.6 or noise_p75 < 0.8:
             items.append(
                 make_evidence(
                     name="noise_residual_hypersmooth",
-                    value={"noise_std": noise_std, "noise_var": noise_var},
+                    value={"noise_std": noise_std, "noise_var": noise_var, "noise_p75": noise_p75},
                     direction=ProductionMethod.GRAPHIC_DESIGN.value,
                     strength=0.85,
-                    explanation=f"Near-zero residual noise (std={noise_std:.2f}); consistent with vector design, digital UI, or flat 3D render.",
+                    explanation=f"Near-zero residual noise across surface (75th percentile={noise_p75:.2f}, std={noise_std:.2f}); consistent with vector design, digital UI, or screenshot.",
                 )
             )
         elif noise_std > 8.0:
@@ -76,8 +78,8 @@ class ForensicsNoiseDetector(BaseDetector):
 
         # Physical sensor test: natural camera noise variance correlates positively with signal luminance
         # In contrast, AI generators often exhibit synthetic or non-correlated noise
-        correlation = self._lum_noise_correlation(lum, np.abs(residual))
-        if correlation is not None:
+        correlation = self._lum_noise_correlation(lum, residual_mag)
+        if correlation is not None and noise_p75 >= 1.5:
             if correlation > 0.35 and noise_std >= 1.5:
                 items.append(
                     make_evidence(
@@ -103,9 +105,14 @@ class ForensicsNoiseDetector(BaseDetector):
 
     def _lum_noise_correlation(self, lum: np.ndarray, noise_mag: np.ndarray) -> Optional[float]:
         try:
-            # Subsample for speed if large
-            sub_lum = lum[::4, ::4].flatten()
-            sub_noise = noise_mag[::4, ::4].flatten()
+            # Randomly sample pixels to avoid moire/lattice harmonic aliasing on periodic patterns
+            total_pixels = lum.size
+            sample_size = min(total_pixels, 50000)
+            rng = np.random.default_rng(42)
+            idx = rng.choice(total_pixels, size=sample_size, replace=False)
+
+            sub_lum = lum.ravel()[idx]
+            sub_noise = noise_mag.ravel()[idx]
             # Remove saturated extremes (pure black/white)
             valid = (sub_lum > 15) & (sub_lum < 240)
             if np.sum(valid) < 500:
@@ -128,21 +135,23 @@ class ForensicsNoiseDetector(BaseDetector):
         lum = 0.299 * crop[:, :, 0] + 0.587 * crop[:, :, 1] + 0.114 * crop[:, :, 2]
         filtered = median_filter(lum, size=3)
         residual = lum - filtered
+        residual_mag = np.abs(residual)
         noise_std = float(np.std(residual))
+        noise_p75 = float(np.percentile(residual_mag, 75))
 
-        if noise_std < 0.6:
+        if noise_std < 0.6 or noise_p75 < 0.8:
             items.append(
                 make_evidence(
                     name="noise_residual_hypersmooth",
-                    value={"noise_std": noise_std},
+                    value={"noise_std": noise_std, "noise_p75": noise_p75},
                     direction=ProductionMethod.GRAPHIC_DESIGN.value,
                     strength=0.85,
-                    explanation=f"Region {region_id} exhibits near-zero residual noise (std={noise_std:.2f}); typical of vector/digital graphic.",
+                    explanation=f"Region {region_id} exhibits near-zero residual noise (75th percentile={noise_p75:.2f}); typical of vector/digital graphic.",
                     region=region_id,
                 )
             )
-        elif noise_std > 2.0:
-            correlation = self._lum_noise_correlation(lum, np.abs(residual))
+        elif noise_std > 2.0 and noise_p75 >= 1.5:
+            correlation = self._lum_noise_correlation(lum, residual_mag)
             if correlation is not None and correlation > 0.25:
                 items.append(
                     make_evidence(
