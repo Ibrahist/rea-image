@@ -33,25 +33,27 @@ class ForensicsFlatDetector(BaseDetector):
         flat_stats = self._analyze_flat_runs(arr)
         flat_pct = flat_stats["flat_pixel_percentage"]
         unique_ratio = flat_stats["unique_color_ratio"]
+        unique_colors = flat_stats.get("unique_colors_sampled", 9999)
 
-        if flat_pct > 25.0 or (flat_pct > 12.0 and unique_ratio < 0.01):
+        is_vector = (flat_pct > 35.0 and unique_ratio < 0.03) or (flat_pct > 15.0 and unique_ratio < 0.01) or (unique_colors < 256)
+        if is_vector:
             items.append(
                 make_evidence(
                     name="flat_color_runs",
                     value=flat_stats,
                     direction=ProductionMethod.GRAPHIC_DESIGN.value,
-                    strength=0.90,
+                    strength=0.85,
                     explanation=f"High proportion of exact flat color runs ({flat_pct:.1f}% flat pixels) and low unique color entropy; characteristic of vector design, infographic, or UI.",
                 )
             )
-        elif flat_pct < 5.0 and unique_ratio > 0.001:
+        elif unique_ratio > 0.02 or flat_pct < 10.0:
             items.append(
                 make_evidence(
                     name="continuous_natural_gradients",
                     value=flat_stats,
                     direction=ProductionMethod.REAL_PHOTO.value,
                     strength=0.75,
-                    explanation=f"Continuous chromatic variation with minimal flat runs ({flat_pct:.2f}% flat); consistent with optical photographic capture.",
+                    explanation=f"Continuous chromatic variation with rich unique color entropy ({unique_ratio*100:.1f}% unique); consistent with optical photographic capture.",
                 )
             )
 

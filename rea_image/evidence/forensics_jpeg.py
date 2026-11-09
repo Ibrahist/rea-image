@@ -129,7 +129,7 @@ class ForensicsJpegDetector(BaseDetector):
         packed = (flat_colors[:, 0].astype(np.uint32) << 16) | (flat_colors[:, 1].astype(np.uint32) << 8) | flat_colors[:, 2].astype(np.uint32)
         unique_count = len(np.unique(packed))
         unique_ratio = unique_count / float(len(packed) + 1e-5)
-        return bool(flat_pct > 15.0 or unique_count < 256 or unique_ratio < 0.005)
+        return bool(unique_count < 256 or unique_ratio < 0.01 or (flat_pct > 35.0 and unique_ratio < 0.03))
 
     def _check_blocking_grid(self, arr: np.ndarray) -> Dict[str, Any]:
         """Detect 8x8 JPEG blocking artifacts and check if they align cleanly."""
