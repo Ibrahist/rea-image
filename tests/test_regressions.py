@@ -150,3 +150,28 @@ def test_segmentation_without_text_has_no_text_block():
     
     labels = [r.label for r in regions]
     assert "text_block" not in labels
+
+
+def test_tesseract_garbage_output_filtered(monkeypatch):
+    """Regression test for A1: When Tesseract returns noisy low-confidence fragments, they must be rejected."""
+    import pytesseract
+    from rea_image.segment.ocr_merger import OCRTextDetector
+
+    # Simulate tesseract image_to_data returning garbage words on photo texture
+    garbage_data = {
+        "text": ["", "es", "BA", "xs", "/-", "1"],
+        "conf": ["-1", "42", "55", "30", "15", "50"],
+    }
+    monkeypatch.setattr(pytesseract, "image_to_data", lambda *args, **kwargs: garbage_data)
+
+    detector = OCRTextDetector()
+    arr = np.random.randint(0, 255, (200, 200, 3), dtype=np.uint8)
+    boxes = detector.detect_text_boxes(arr)
+
+    # All candidate boxes with garbage OCR text must be rejected
+    assert len(boxes) == 0
+
+    # Also verify that segmenter produces zero text_block regions
+    segmenter = ClassicalSegmenter()
+    regions = segmenter.segment(arr)
+    assert not any(r.label == "text_block" for r in regions)

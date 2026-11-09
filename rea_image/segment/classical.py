@@ -29,8 +29,9 @@ class ClassicalSegmenter:
         for tb in text_boxes:
             # Require confirmed OCR text before labeling any region as text_block
             text_str = tb.get("text", "").strip()
+            words = tb.get("words", [])
             alnums = [c for c in text_str if c.isalnum()]
-            if len(alnums) < 2:
+            if not text_str or not words or len(alnums) < 3:
                 continue
 
             bx, by, bw, bh = tb["bbox"]

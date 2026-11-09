@@ -27,6 +27,18 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.4.0",
 ]
+ocr = [
+    "pytesseract>=0.3.10",
+]
+heic = [
+    "pillow-heif>=0.15.0",
+]
+avif = [
+    "pillow-heif>=0.15.0",
+]
+vlm = [
+    "httpx>=0.27.0",
+]
 
 [project.scripts]
 rea-image = "rea_image.cli:app"

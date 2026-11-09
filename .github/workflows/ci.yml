@@ -43,3 +43,29 @@ jobs:
           rea-image --help
           python -m rea_image.cli --help
 
+  test-ocr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install system Tesseract OCR
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr
+
+      - name: Install dependencies with OCR extra
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,ocr]"
+
+      - name: Run Pytest with Tesseract installed
+        run: |
+          python -m pytest tests/test_regressions.py -v
+
