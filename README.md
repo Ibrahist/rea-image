@@ -1,7 +1,5 @@
 # rea-image
 
-!rea-image[](logo-banner.svg)
-
 > Reverse-engineer any still image: deconstruct how it was made, present measurable evidence, and produce a blueprint to recreate it.
 
 `rea-image` is an open-source tool and AI agent skill to reverse-engineer still images. It analyzes an image or folder of images, classifies every layer/region into its true production method (real photograph, AI-generated, 3D render, graphic design, UI screenshot, illustration, or composite), backs every claim with hard provenance and forensic measurements, and generates actionable recreation blueprints via the cheapest viable path.
