@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="t d">
+  <title id="t">rea-image</title>
+  <desc id="d">A picture frame with a mountain and sun, and an orange arrow looping backward out of it, meaning reverse-engineer an image.</desc>
+  <rect width="512" height="512" rx="96" fill="#12151C"/>
+  <g transform="translate(4,5)">
+    <rect x="116" y="120" width="220" height="176" rx="22" fill="none" stroke="#5EEAD4" stroke-width="14"/>
+    <circle cx="170" cy="176" r="18" fill="#5EEAD4"/>
+    <path d="M138 272 L210 200 L258 244 L292 212 L316 272 Z" fill="#5EEAD4"/>
+    <path d="M356 176 L392 176 L392 352 L112 352" fill="none" stroke="#F2994A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M144 322 L112 352 L144 382" fill="none" stroke="#F2994A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

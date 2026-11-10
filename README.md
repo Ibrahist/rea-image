@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="assets/logo-banner.svg" alt="rea-image banner" width="100%">
-</p>
+![alt text](rea-image.png)
 
 # rea-image
 
