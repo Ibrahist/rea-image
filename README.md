@@ -4,7 +4,7 @@
 
 > Reverse-engineer any still image: deconstruct how it was made, present measurable evidence, and produce a blueprint to recreate it.
 > 
-> 🌐 **Interactive Web Guide & Live Showcase**: [ibrahist.github.io/rea-image](https://ibrahist.github.io/rea-image/)
+> 🌐 **Interactive Web Guide & Live Showcase**: [rea-image.netlify.app](https://rea-image.netlify.app/)
 
 `rea-image` is an open-source tool and AI agent skill to reverse-engineer still images. It analyzes an image or folder of images, classifies every layer/region into its true production method (real photograph, AI-generated, 3D render, graphic design, UI screenshot, illustration, or composite), backs every claim with hard provenance and forensic measurements, and generates actionable recreation blueprints via the cheapest viable path.
 
@@ -258,7 +258,7 @@ Copy and paste any of these prompts into your agent chat:
 
 ## Documentation
 
-- [Interactive Webpage & Visual Showcase](https://ibrahist.github.io/rea-image/): Interactive online guide with live deconstruction demo, CLI runner, and architecture overview.
+- [Interactive Web Guide & Visual Showcase](https://rea-image.netlify.app/): Interactive online guide with live deconstruction demo, CLI runner, and architecture overview.
 - [What It Detects](docs/what-it-detects.md): The 7 production methods, evidence weights, and detector details.
 - [Decomposition Pipeline](docs/decompose.md): Ingest, semantic segmentation, craft extraction, and judgment.
 - [Replication Blueprints](docs/replicate.md): Cheapest-viable-path routing, batching strategy, and prompt construction.
