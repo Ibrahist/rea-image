@@ -3,12 +3,23 @@
 from typing import Any, Dict, Optional
 import numpy as np
 from scipy.ndimage import laplace
+from rea_image.evidence.camera_detector import CameraDetector
 
 
 class CameraCraftEstimator:
     """Estimates photographic camera, lens, and optical parameters from image signals."""
 
-    def estimate(self, arr: np.ndarray, regions: Optional[list] = None) -> Dict[str, Any]:
+    def __init__(self):
+        self.detector = CameraDetector()
+
+    def estimate(
+        self,
+        arr: np.ndarray,
+        regions: Optional[list] = None,
+        ingest_res: Optional[Any] = None,
+        aspect_ratio: Optional[str] = None,
+        is_photograph: bool = True,
+    ) -> Dict[str, Any]:
         h, w, _ = arr.shape
         lum = (0.299 * arr[:, :, 0] + 0.587 * arr[:, :, 1] + 0.114 * arr[:, :, 2]).astype(np.float32)
 
@@ -24,7 +35,7 @@ class CameraCraftEstimator:
         # 4. Chromatic Aberration
         ca_info = self._estimate_chromatic_aberration(arr)
 
-        return {
+        optical_craft = {
             "focal_length_class": focal_info["focal_class"],
             "estimated_focal_length": focal_info["estimated_mm"],
             "perspective_compression": focal_info["compression"],
@@ -34,6 +45,39 @@ class CameraCraftEstimator:
             "vignette_falloff": vignette_info,
             "chromatic_aberration": ca_info,
         }
+
+        # 5. Detect physical or inferred camera hardware
+        img = getattr(ingest_res, "rgb_image", None)
+        path = getattr(ingest_res, "path", None)
+        meta = getattr(ingest_res, "metadata", None)
+        ar = aspect_ratio or (meta.aspect_ratio if meta else f"{w}:{h}")
+
+        detected_cam = self.detector.detect(
+            arr=arr,
+            aspect_ratio=ar,
+            optical_craft=optical_craft,
+            img=img,
+            path=path,
+            is_photograph=is_photograph,
+        )
+
+        # If hardware EXIF gave specific aperture / focal length, enhance optical craft
+        if detected_cam.get("aperture"):
+            optical_craft["estimated_aperture"] = detected_cam["aperture"]
+        if detected_cam.get("focal_length"):
+            focal_disp = detected_cam["focal_length"]
+            if detected_cam.get("focal_length_35mm"):
+                focal_disp = f"{focal_disp} (35mm eq: {detected_cam['focal_length_35mm']})"
+            optical_craft["estimated_focal_length"] = focal_disp
+
+        optical_craft["detected_camera"] = detected_cam
+        optical_craft["camera_make"] = detected_cam.get("make")
+        optical_craft["camera_model"] = detected_cam.get("model")
+        optical_craft["camera_type"] = detected_cam.get("device_type")
+        optical_craft["camera_sensor"] = detected_cam.get("sensor_format")
+        optical_craft["camera_summary"] = detected_cam.get("summary")
+
+        return optical_craft
 
     def _estimate_dof(self, arr: np.ndarray, lum: np.ndarray, regions: Optional[list]) -> Dict[str, str]:
         # Measure edge sharpness via Laplace variance
@@ -120,4 +164,3 @@ class CameraCraftEstimator:
             return "visible lateral chromatic aberration (cyan/magenta color fringing)"
         else:
             return "well-corrected / minimal chromatic aberration"
-

@@ -138,27 +138,45 @@ class PhotoShootPlanner:
             location = "Controlled photography location matching scene ambient illumination"
 
         # Camera & lens settings
-        focal = camera_info.get("estimated_focal_length") or "50mm normal lens"
-        aperture = camera_info.get("estimated_aperture") or "f/2.8"
+        det_cam = camera_info.get("detected_camera") or {}
+        cam_body = (
+            camera_info.get("camera_summary")
+            or camera_info.get("display_name")
+            or det_cam.get("summary")
+            or det_cam.get("display_name")
+            or "Dedicated Mirrorless / DSLR or modern smartphone camera"
+        )
+        focal = det_cam.get("lens") or camera_info.get("estimated_focal_length") or "50mm normal lens"
+        aperture = det_cam.get("aperture") or camera_info.get("estimated_aperture") or "f/2.8"
         focal_class = camera_info.get("focal_length_class", "").lower()
         is_telephoto = "telephoto" in focal_class or "telephoto" in str(focal).lower()
 
-        # Shutter speed suited to the scene
-        if is_outdoor or is_telephoto or not subject_is_human:
+        # Shutter speed suited to the scene (use actual hardware settings if available)
+        if det_cam.get("shutter_speed"):
+            shutter = det_cam["shutter_speed"]
+        elif is_outdoor or is_telephoto or not subject_is_human:
             shutter = "1/500s - 1/1000s (fast shutter to freeze subject motion in ambient light)"
-            iso = "ISO 100 - 400"
         elif is_overcast:
             shutter = "1/250s - 1/500s (handheld camera stability)"
-            iso = "ISO 200 - 800"
         elif is_studio:
             shutter = "1/160s (strobe sync speed)"
-            iso = "ISO 100 base"
         else:
             shutter = "1/200s"
+
+        if det_cam.get("iso"):
+            iso = f"ISO {det_cam['iso']}"
+        elif is_outdoor or is_telephoto or not subject_is_human:
+            iso = "ISO 100 - 400"
+        elif is_overcast:
+            iso = "ISO 200 - 800"
+        elif is_studio:
+            iso = "ISO 100 base"
+        else:
             iso = "ISO 100 - 400"
 
         # Gear list
-        gear_list = list(lighting_info.get("suggested_gear") or lighting_info.get("gear") or [])
+        gear_list = [f"Camera: {cam_body}"]
+        gear_list.extend(lighting_info.get("suggested_gear") or lighting_info.get("gear") or [])
         if is_outdoor:
             if not gear_list:
                 gear_list = [
@@ -201,6 +219,7 @@ class PhotoShootPlanner:
         return {
             "location": location,
             "camera_settings": {
+                "camera": cam_body,
                 "lens": focal,
                 "aperture": aperture,
                 "shutter_speed": shutter,

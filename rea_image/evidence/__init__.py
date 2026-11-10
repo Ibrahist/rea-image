@@ -12,6 +12,7 @@ from rea_image.evidence.visual_checks import VisualChecksDetector
 from rea_image.evidence.craft_color import extract_dominant_palette, analyze_color_grade
 from rea_image.evidence.craft_composition import analyze_composition
 from rea_image.evidence.craft_camera import CameraCraftEstimator
+from rea_image.evidence.camera_detector import CameraDetector
 from rea_image.evidence.craft_lighting import LightingClassifier
 from rea_image.evidence.typography import TypographyAnalyzer, analyze_layout_grid
 from rea_image.evidence.registry import (
@@ -36,6 +37,7 @@ __all__ = [
     "analyze_color_grade",
     "analyze_composition",
     "CameraCraftEstimator",
+    "CameraDetector",
     "LightingClassifier",
     "TypographyAnalyzer",
     "analyze_layout_grid",

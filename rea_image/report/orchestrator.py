@@ -202,7 +202,7 @@ def run_analysis_pipeline(
         color_grade = cached_craft["color_grade"]
         composition = CompositionInfo(**cached_craft["composition"])
     else:
-        camera_info = CameraCraftEstimator().estimate(arr, seg_regions)
+        camera_info = CameraCraftEstimator().estimate(arr, seg_regions, ingest_res=ingest_res)
         lighting_info = LightingClassifier().classify(arr)
         palette = extract_dominant_palette(arr, n_colors=6)
         color_grade = analyze_color_grade(arr)
@@ -317,6 +317,7 @@ def run_analysis_pipeline(
         color_grade=color_grade,
         typography=typography.model_dump(),
         layout_grid=layout_grid,
+        camera=camera_info.get("detected_camera", {}),
     )
 
     limitations = [

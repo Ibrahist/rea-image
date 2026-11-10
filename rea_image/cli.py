@@ -180,6 +180,9 @@ def analyze(
             if fmt == "table":
                 console.print(f"\n[bold green]✓ Analysis complete for {img_path.name}[/bold green]")
                 console.print(f"  [bold]Verdict:[/bold] {report.verdict.summary}")
+                cam = getattr(report.global_analysis, "camera", {})
+                if cam and cam.get("detected"):
+                    console.print(f"  [bold]Camera:[/bold] [cyan]{cam.get('summary')}[/cyan]")
                 console.print(f"  [bold]Reports saved to:[/bold] {resolved_dir}")
             if open_browser and resolved_dir:
                 import webbrowser
@@ -572,6 +575,81 @@ def provenance(
 
     for ev in all_evidence:
         table.add_row(ev.name, ev.direction, f"{ev.strength:.2f}", ev.explanation)
+
+    console.print(table)
+
+
+@app.command()
+def camera(
+    image: Path = typer.Argument(..., help="Path to image file."),
+    json_out: bool = typer.Option(False, "--json", help="Output detected camera parameters as JSON."),
+):
+    """Detect and inspect the physical or inferred camera that captured an image."""
+    from rea_image.ingest.loader import load_image
+    from rea_image.evidence.craft_camera import CameraCraftEstimator
+    from rea_image.evidence.generator_traces import GeneratorTracesDetector
+
+    res = load_image(image)
+    gen_items = GeneratorTracesDetector().run(res)
+    is_photo = not any("ai" in it.direction.lower() for it in gen_items)
+    cam_info = CameraCraftEstimator().estimate(res.rgb_array, ingest_res=res, is_photograph=is_photo)
+    detected = cam_info.get("detected_camera", {})
+
+    if json_out:
+        import json
+        console.print_json(json.dumps(detected, ensure_ascii=False))
+        return
+
+    is_hw = detected.get("source") == "hardware_exif"
+    status_color = "green" if is_hw else ("yellow" if detected.get("detected") else "red")
+
+    console.print(Panel(
+        f"[bold {status_color}]Camera Profile: {detected.get('display_name', 'Unknown')}[/bold {status_color}]\n"
+        f"• Status: {'Detected via Hardware EXIF' if is_hw else ('Inferred from Optical Forensics' if detected.get('detected') else 'No Camera Detected')}\n"
+        f"• Confidence: {detected.get('confidence', 'none').upper()}\n"
+        f"• Device Type: {detected.get('device_type_label', 'Unknown')}\n"
+        f"• Sensor Format: {detected.get('sensor_format_label', 'Unknown')}"
+        + (f" (Crop: {detected.get('sensor_crop_factor')}x)" if detected.get("sensor_crop_factor") else ""),
+        title=f"📷 Camera Identification — {image.name}",
+        expand=False,
+    ))
+
+    table = Table(title="Shooting Parameters & Optical Diagnostics", show_header=True, header_style="bold magenta")
+    table.add_column("Property", style="cyan")
+    table.add_column("Value", style="white")
+
+    if detected.get("lens"):
+        table.add_row("Lens Model", detected["lens"])
+    if detected.get("focal_length"):
+        focal_str = detected["focal_length"]
+        if detected.get("focal_length_35mm"):
+            focal_str += f" (35mm equivalent: {detected['focal_length_35mm']})"
+        table.add_row("Focal Length", focal_str)
+    if detected.get("aperture"):
+        table.add_row("Aperture", detected["aperture"])
+    if detected.get("shutter_speed"):
+        table.add_row("Shutter Speed", detected["shutter_speed"])
+    if detected.get("iso"):
+        table.add_row("ISO Sensitivity", f"ISO {detected['iso']}")
+    if detected.get("exposure_program"):
+        table.add_row("Exposure Program", detected["exposure_program"])
+    if detected.get("metering_mode"):
+        table.add_row("Metering Mode", detected["metering_mode"])
+    if detected.get("software_firmware"):
+        table.add_row("OS / Firmware", detected["software_firmware"])
+    if detected.get("datetime_original"):
+        table.add_row("Capture Timestamp", detected["datetime_original"])
+
+    sigs = detected.get("optical_signatures", {})
+    if sigs.get("depth_of_field"):
+        table.add_row("Depth of Field", sigs["depth_of_field"])
+    if sigs.get("vignette_falloff"):
+        table.add_row("Vignette Profile", sigs["vignette_falloff"])
+    if sigs.get("chromatic_aberration"):
+        table.add_row("Chromatic Aberration", sigs["chromatic_aberration"])
+
+    for tr in detected.get("computational_traces", []):
+        table.add_row("Forensic Trace", tr)
 
     console.print(table)
 

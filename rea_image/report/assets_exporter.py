@@ -92,6 +92,7 @@ def export_assets_bundle(
             "# Photo Shoot Plan & Production Notes\n",
             f"**Location**: {shoot_plan_data.get('location', 'Studio')}\n",
             "## Camera Settings",
+            f"- Camera: {shoot_plan_data.get('camera_settings', {}).get('camera', 'Standard DSLR / Mirrorless')}",
             f"- Lens: {shoot_plan_data.get('camera_settings', {}).get('lens', '50mm')}",
             f"- Aperture: {shoot_plan_data.get('camera_settings', {}).get('aperture', 'f/2.8')}",
             f"- Shutter: {shoot_plan_data.get('camera_settings', {}).get('shutter_speed', '1/160s')}",

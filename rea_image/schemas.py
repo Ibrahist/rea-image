@@ -161,6 +161,7 @@ class GlobalAnalysis(BaseModel):
     color_grade: Dict[str, Any] = Field(default_factory=dict)
     typography: Dict[str, Any] = Field(default_factory=dict)
     layout_grid: Dict[str, Any] = Field(default_factory=dict)
+    camera: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ReportSchema(BaseModel):

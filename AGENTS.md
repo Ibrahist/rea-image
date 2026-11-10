@@ -27,6 +27,9 @@ python -m rea_image.cli analyze /path/to/image.png --agent-review
 # Inspect provenance and metadata only
 python -m rea_image.cli provenance /path/to/image.png
 
+# Detect camera hardware or infer capture device
+python -m rea_image.cli camera /path/to/image.png
+
 # Extract color palette and grading
 python -m rea_image.cli palette /path/to/image.png
 

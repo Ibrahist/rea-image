@@ -43,7 +43,7 @@ Navigate to the specified output folder:
    - `verdict.method_breakdown`: Proportion of each medium (real photo, AI-generated, 3D render, graphic design, UI screenshot, illustration, composite).
    - `regions`: Bounding boxes, method classification, top supporting/contradicting evidence items.
    - `needs_review`: Conflicts identified by automated forensics that need your visual review.
-   - `global`: Camera optics estimate, lighting setup, color palette, and composition.
+   - `global`: Camera hardware/optical detection, lighting setup, color palette, and composition.
 
 ### 3. Perform Agent Review (if `needs_review` is populated)
 If `needs_review` contains entries:
@@ -69,6 +69,9 @@ python -m rea_image.cli palette "/path/to/image.png"
 
 # Provenance, EXIF, and AI generator chunks only
 python -m rea_image.cli provenance "/path/to/image.png"
+
+# Detect physical camera hardware or infer capture device
+python -m rea_image.cli camera "/path/to/image.png"
 
 # Reverse-engineered prompt only
 python -m rea_image.cli prompt "/path/to/image.png"

@@ -302,6 +302,58 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </section>
     </div>
 
+    <!-- Camera Hardware & Optical Profile -->
+    {% if report.global_analysis.camera and report.global_analysis.camera.detected %}
+    <section class="card" style="border-left: 4px solid var(--accent); margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <h2 class="card-title" style="margin-bottom: 0;">📷 Camera Hardware & Optical Profile</h2>
+        <span class="badge {{ 'badge-high' if report.global_analysis.camera.confidence == 'high' else 'badge-medium' }}">
+          {{ report.global_analysis.camera.source | replace('_', ' ') | upper }} ({{ report.global_analysis.camera.confidence | upper }})
+        </span>
+      </div>
+      <p style="font-size: 1.1rem; color: #fff; font-weight: 600; margin-bottom: 16px;">
+        {{ report.global_analysis.camera.display_name }}
+        <span style="font-size: 0.85rem; font-weight: normal; color: var(--text-muted); margin-left: 8px;">
+          ({{ report.global_analysis.camera.device_type_label }} • {{ report.global_analysis.camera.sensor_format_label }})
+        </span>
+      </p>
+      <div class="grid-2" style="margin-bottom: 0;">
+        <ul style="list-style: none; font-size: 0.9rem; color: var(--text-muted); line-height: 1.8;">
+          {% if report.global_analysis.camera.lens %}
+          <li>• <strong>Lens Model:</strong> <span style="color: #fff;">{{ report.global_analysis.camera.lens }}</span></li>
+          {% endif %}
+          {% if report.global_analysis.camera.focal_length %}
+          <li>• <strong>Focal Length:</strong> {{ report.global_analysis.camera.focal_length }}{% if report.global_analysis.camera.focal_length_35mm %} (35mm eq: {{ report.global_analysis.camera.focal_length_35mm }}){% endif %}</li>
+          {% endif %}
+          {% if report.global_analysis.camera.aperture %}
+          <li>• <strong>Aperture:</strong> {{ report.global_analysis.camera.aperture }}</li>
+          {% endif %}
+          {% if report.global_analysis.camera.shutter_speed %}
+          <li>• <strong>Shutter Speed:</strong> {{ report.global_analysis.camera.shutter_speed }}</li>
+          {% endif %}
+          {% if report.global_analysis.camera.iso %}
+          <li>• <strong>ISO Sensitivity:</strong> ISO {{ report.global_analysis.camera.iso }}</li>
+          {% endif %}
+        </ul>
+        <ul style="list-style: none; font-size: 0.9rem; color: var(--text-muted); line-height: 1.8;">
+          {% if report.global_analysis.camera.exposure_program %}
+          <li>• <strong>Exposure Program:</strong> {{ report.global_analysis.camera.exposure_program }}</li>
+          {% endif %}
+          {% if report.global_analysis.camera.software_firmware %}
+          <li>• <strong>OS / Firmware:</strong> {{ report.global_analysis.camera.software_firmware }}</li>
+          {% endif %}
+          {% if report.global_analysis.camera.optical_signatures %}
+          <li>• <strong>Depth of Field:</strong> {{ report.global_analysis.camera.optical_signatures.depth_of_field or 'Standard' }}</li>
+          <li>• <strong>Vignette Profile:</strong> {{ report.global_analysis.camera.optical_signatures.vignette_falloff or 'Natural' }}</li>
+          {% endif %}
+          {% if report.global_analysis.camera.computational_traces %}
+          <li>• <strong>Computational Traces:</strong> {{ report.global_analysis.camera.computational_traces | join('; ') }}</li>
+          {% endif %}
+        </ul>
+      </div>
+    </section>
+    {% endif %}
+
     <!-- Per-Region Cards -->
     <section class="card">
       <h2 class="card-title">Decomposed Regions & Recreation Plans</h2>

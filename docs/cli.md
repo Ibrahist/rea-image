@@ -100,6 +100,19 @@ rea-image recreate <out_dir> --confirm
 
 ---
 
+### `camera`
+Detects and inspects the physical or inferred camera hardware that captured an image:
+```bash
+# Display formatted terminal card with camera profile and optical diagnostics
+rea-image camera <image_path>
+
+# Output raw detected camera JSON schema
+rea-image camera <image_path> --json
+```
+Extracts camera make, model, device classification (smartphone, mirrorless, DSLR, compact, drone, action camera), sensor format, lens model, aperture, shutter speed, ISO, and shooting parameters. If EXIF metadata was stripped, infers camera classification from aspect ratio constraints, depth of field, and computational unsharp masking halo forensics.
+
+---
+
 ### `eval`
 Executes the evaluation benchmark harness against a labeled dataset:
 ```bash
