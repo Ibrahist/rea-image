@@ -262,15 +262,20 @@ def test_pluggable_detectors_and_disable_flag(tmp_path: Path):
     assert "Unknown detector 'nosie'" in res_typo.output
 
     # Broken detector test: fails gracefully and records in skipped_detectors
-    class BrokenDetector:
-        def __init__(self):
-            raise RuntimeError("Initialization crash test")
+    try:
+        class BrokenDetector:
+            def __init__(self):
+                raise RuntimeError("Initialization crash test")
 
-    register_detector("broken", BrokenDetector)
-    skipped = []
-    active_with_broken = get_active_detectors(skipped_detectors=skipped)
-    assert "broken" in skipped
-    assert BrokenDetector not in [type(d) for d in active_with_broken]
+        register_detector("broken", BrokenDetector)
+        skipped = []
+        active_with_broken = get_active_detectors(skipped_detectors=skipped)
+        assert "broken" in skipped
+        assert BrokenDetector not in [type(d) for d in active_with_broken]
+    finally:
+        from rea_image.evidence.registry import DETECTORS
+        DETECTORS.pop("dummy", None)
+        DETECTORS.pop("broken", None)
 
 
 def test_cli_analyze_parallel_jobs(tmp_path: Path):
