@@ -307,7 +307,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <section class="card" style="border-left: 4px solid var(--accent); margin-bottom: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
         <h2 class="card-title" style="margin-bottom: 0;">📷 Camera Hardware & Optical Profile</h2>
-        <span class="badge {{ 'badge-high' if report.global_analysis.camera.confidence == 'high' else 'badge-medium' }}">
+        <span class="badge {{ 'badge-high' if report.global_analysis.camera.confidence == 'high' else ('badge-medium' if report.global_analysis.camera.confidence == 'medium' else 'badge-low') }}">
           {{ report.global_analysis.camera.source | replace('_', ' ') | upper }} ({{ report.global_analysis.camera.confidence | upper }})
         </span>
       </div>
@@ -351,6 +351,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           {% endif %}
         </ul>
       </div>
+      {% if report.global_analysis.camera.why_believed or report.global_analysis.camera.why_doubted %}
+      <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
+        {% if report.global_analysis.camera.why_believed %}
+        <div>
+          <span style="font-size: 0.85rem; font-weight: 600; color: #4ade80;">Corroborating Evidence:</span>
+          <ul style="margin: 4px 0 0 18px; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+            {% for item in report.global_analysis.camera.why_believed %}
+            <li>✓ {{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% if report.global_analysis.camera.why_doubted %}
+        <div>
+          <span style="font-size: 0.85rem; font-weight: 600; color: #f87171;">Contradictions & Doubts:</span>
+          <ul style="margin: 4px 0 0 18px; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+            {% for item in report.global_analysis.camera.why_doubted %}
+            <li>⚠️ {{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
     </section>
     {% endif %}
 

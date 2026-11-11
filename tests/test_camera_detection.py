@@ -219,7 +219,9 @@ def test_camera_catalog_table_driven():
 def test_hardware_exif_camera_detection(tmp_path: Path):
     """Test extracting camera specs from an image with genuine EXIF data."""
     img_path = tmp_path / "sony_photo.jpg"
-    img = Image.new("RGB", (300, 200), color=(180, 140, 100))
+    rng = np.random.default_rng(42)
+    arr = rng.normal(128, 15, (200, 300, 3)).clip(0, 255).astype(np.uint8)
+    img = Image.fromarray(arr)
 
     exif = img.getexif()
     exif[ExifTags.Base.Make] = "Sony"
@@ -243,8 +245,8 @@ def test_hardware_exif_camera_detection(tmp_path: Path):
 
     assert hw_cam is not None
     assert hw_cam["detected"] is True
-    assert hw_cam["source"] == "hardware_exif"
-    assert hw_cam["confidence"] == "high"
+    assert hw_cam["source"] == "exif_metadata"
+    assert hw_cam["confidence"] == "medium"
     assert hw_cam["make"] == "Sony"
     assert hw_cam["model"] == "ILCE-7M4"
     assert hw_cam["device_type"] == "mirrorless"
@@ -257,6 +259,20 @@ def test_hardware_exif_camera_detection(tmp_path: Path):
     assert hw_cam["shutter_speed"] == "1/250s"
     assert hw_cam["iso"] == "100"
     assert "Sony ILCE-7M4" in hw_cam["summary"]
+
+    # When corroborated through detect() with matching 3:2 aspect, focal ratio, and noise
+    with Image.open(img_path) as loaded_img:
+        corroborated = detector.detect(
+            arr=np.array(loaded_img),
+            aspect_ratio="3:2",
+            optical_craft={},
+            img=loaded_img,
+            path=img_path,
+            is_photograph=True,
+        )
+    assert corroborated["confidence"] == "high"
+    assert len(corroborated["why_believed"]) >= 2
+    assert not corroborated["why_doubted"]
 
 
 def test_inferred_optical_camera_detection():
@@ -603,3 +619,84 @@ def test_cli_redact_metadata_flag(tmp_path: Path):
     assert res_redacted.exit_code == 0
     assert "2024:06:15 14:30:00" not in res_redacted.output
     assert "Capture Timestamp" not in res_redacted.output
+
+
+def test_corroborate_exif_editor_downgrade(tmp_path: Path):
+    """Test editing software in EXIF downgrades confidence to low and documents in why_doubted."""
+    img_path = tmp_path / "photoshop_edited.jpg"
+    rng = np.random.default_rng(42)
+    arr = rng.normal(128, 20, (200, 300, 3)).clip(0, 255).astype(np.uint8)
+    img = Image.fromarray(arr)
+
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Nikon"
+    exif[ExifTags.Base.Model] = "Z 8"
+    exif[ExifTags.Base.Software] = "Adobe Photoshop 2024"
+    img.save(img_path, "JPEG", exif=exif)
+
+    detector = CameraDetector()
+    with Image.open(img_path) as loaded:
+        res = detector.detect(arr=arr, aspect_ratio="3:2", optical_craft={}, img=loaded, path=img_path)
+    assert res["confidence"] == "low"
+    assert any("editor" in d for d in res["why_doubted"])
+
+
+def test_corroborate_exif_ai_tool_downgrade(tmp_path: Path):
+    """Test AI generative software tag in EXIF triggers doubt and confidence low."""
+    img_path = tmp_path / "midjourney_exif.jpg"
+    rng = np.random.default_rng(42)
+    arr = rng.normal(128, 20, (200, 300, 3)).clip(0, 255).astype(np.uint8)
+    img = Image.fromarray(arr)
+
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Canon"
+    exif[ExifTags.Base.Model] = "EOS R5"
+    exif[ExifTags.Base.Software] = "Midjourney v6"
+    img.save(img_path, "JPEG", exif=exif)
+
+    detector = CameraDetector()
+    with Image.open(img_path) as loaded:
+        res = detector.detect(arr=arr, aspect_ratio="3:2", optical_craft={}, img=loaded, path=img_path)
+    assert res["confidence"] == "low"
+    assert any("AI generative tool" in d for d in res["why_doubted"])
+
+
+def test_corroborate_exif_focal_crop_mismatch(tmp_path: Path):
+    """Test conflicting focal length to 35mm crop factor ratio lowers confidence."""
+    img_path = tmp_path / "focal_mismatch.jpg"
+    rng = np.random.default_rng(42)
+    arr = rng.normal(128, 20, (200, 300, 3)).clip(0, 255).astype(np.uint8)
+    img = Image.fromarray(arr)
+
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Sony"
+    exif[ExifTags.Base.Model] = "ILCE-7M4"  # Full frame, crop factor 1.0
+
+    exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+    exif_ifd[ExifTags.Base.FocalLength] = (24, 1)
+    exif_ifd[ExifTags.Base.FocalLengthIn35mmFilm] = 72  # 3.0x ratio vs expected 1.0
+    img.save(img_path, "JPEG", exif=exif)
+
+    detector = CameraDetector()
+    with Image.open(img_path) as loaded:
+        res = detector.detect(arr=arr, aspect_ratio="3:2", optical_craft={}, img=loaded, path=img_path)
+    assert res["confidence"] == "low"
+    assert any("conflicts with sensor crop factor" in d for d in res["why_doubted"])
+
+
+def test_corroborate_exif_hypersmooth_pixels(tmp_path: Path):
+    """Test zero-noise pixel profile contradicts camera sensor expectation."""
+    img_path = tmp_path / "flat_sensor.jpg"
+    arr = np.full((200, 300, 3), 128, dtype=np.uint8)
+    img = Image.fromarray(arr)
+
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Canon"
+    exif[ExifTags.Base.Model] = "EOS 5D Mark IV"
+    img.save(img_path, "JPEG", exif=exif)
+
+    detector = CameraDetector()
+    with Image.open(img_path) as loaded:
+        res = detector.detect(arr=arr, aspect_ratio="3:2", optical_craft={}, img=loaded, path=img_path)
+    assert res["confidence"] == "low"
+    assert any("Pixel noise profile is near-zero" in d for d in res["why_doubted"])

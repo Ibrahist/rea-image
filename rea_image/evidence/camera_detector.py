@@ -192,6 +192,37 @@ PRIVACY_SENSITIVE_TAGS = {
     "GPSLongitude",
 }
 
+EDITING_SOFTWARE_KEYWORDS = [
+    "photoshop",
+    "lightroom",
+    "gimp",
+    "canva",
+    "snapseed",
+    "affinity",
+    "capture one",
+    "vsco",
+    "pixlr",
+    "paint.net",
+    "corel",
+    "darktable",
+]
+
+GENERATIVE_SOFTWARE_KEYWORDS = [
+    "stable diffusion",
+    "midjourney",
+    "dall-e",
+    "dalle",
+    "comfyui",
+    "novelai",
+    "automatic1111",
+    "invokeai",
+    "fooocus",
+    "flux",
+    "adobe firefly",
+    "firefly",
+    "bing image creator",
+]
+
 
 # ---------------------------------------------------------------------------
 # Camera Classification Rules
@@ -520,8 +551,8 @@ class CameraDetector:
 
         return {
             "detected": True,
-            "source": "hardware_exif",
-            "confidence": "high",
+            "source": "exif_metadata",
+            "confidence": "medium",
             "make": classification["canonical_make"],
             "model": classification["clean_model"],
             "display_name": classification["display_name"],
@@ -533,6 +564,8 @@ class CameraDetector:
             "lens": lens or None,
             "focal_length": focal_str,
             "focal_length_35mm": focal_35_str,
+            "focal_length_mm": focal_raw,
+            "focal_length_35mm_val": focal_35_raw,
             "aperture": aperture_str,
             "shutter_speed": shutter_str,
             "iso": str(iso) if iso is not None else None,
@@ -542,6 +575,8 @@ class CameraDetector:
             "software_firmware": software or None,
             "datetime_original": date_time or None,
             "computational_traces": [],
+            "why_believed": [],
+            "why_doubted": [],
             "summary": summary,
         }
 
@@ -674,6 +709,112 @@ class CameraDetector:
             "summary": summary,
         }
 
+    def corroborate_exif(
+        self,
+        hw_cam: Dict[str, Any],
+        arr: np.ndarray,
+        aspect_ratio: Optional[str] = None,
+    ) -> None:
+        """Corroborate EXIF metadata claim against pixel physics and metadata consistency.
+
+        Updates hw_cam['confidence'], hw_cam['why_believed'], and hw_cam['why_doubted'].
+        """
+        why_believed: List[str] = list(hw_cam.get("why_believed", []))
+        why_doubted: List[str] = list(hw_cam.get("why_doubted", []))
+
+        # 1. Native sensor aspect ratio vs frame geometry
+        h, w = arr.shape[:2]
+        ar_val = max(w, h) / min(w, h) if min(w, h) > 0 else 1.0
+        s_format = str(hw_cam.get("sensor_format", "")).lower()
+        dev_type = str(hw_cam.get("device_type", "")).lower()
+
+        expected_aspect = None
+        expected_ratio = None
+        if any(k in s_format for k in ("full_frame", "aps_c", "aps-c")) or dev_type in ("dslr", "mirrorless"):
+            expected_aspect = "3:2"
+            expected_ratio = 1.5
+        elif any(k in s_format for k in ("micro_four_thirds", "mft", "medium_format", "smartphone", "compact", "drone", "1_inch")) or dev_type in ("smartphone", "compact", "drone"):
+            expected_aspect = "4:3"
+            expected_ratio = 4.0 / 3.0
+
+        if expected_aspect is not None and expected_ratio is not None:
+            ratio_matches = abs(ar_val - expected_ratio) <= 0.06
+            str_matches = bool(aspect_ratio and expected_aspect in str(aspect_ratio))
+            if ratio_matches or str_matches:
+                why_believed.append(f"Aspect ratio matches native sensor format ({expected_aspect})")
+
+        # 2. 35mm-equivalent vs focal length ratio matches sensor crop factor (±10%)
+        focal_mm = hw_cam.get("focal_length_mm")
+        focal_35_mm = hw_cam.get("focal_length_35mm_val")
+        crop_factor = hw_cam.get("sensor_crop_factor")
+
+        if focal_mm and focal_35_mm and focal_mm > 0 and focal_35_mm > 0 and crop_factor and crop_factor > 0:
+            measured_crop = focal_35_mm / focal_mm
+            crop_err = abs(measured_crop - crop_factor) / crop_factor
+            if crop_err <= 0.10:
+                why_believed.append(
+                    f"Focal length ratio ({measured_crop:.2f}x) corroborates sensor crop factor ({crop_factor:.2f}x)"
+                )
+            elif crop_err > 0.20:
+                why_doubted.append(
+                    f"Focal length ratio ({measured_crop:.2f}x) conflicts with sensor crop factor ({crop_factor:.2f}x)"
+                )
+
+        # 3. Software / HostComputer metadata tag
+        software = hw_cam.get("software_firmware")
+        if software:
+            sw_lower = software.lower()
+            has_gen = any(kw in sw_lower for kw in GENERATIVE_SOFTWARE_KEYWORDS)
+            has_edit = any(kw in sw_lower for kw in EDITING_SOFTWARE_KEYWORDS)
+
+            if has_gen:
+                why_doubted.append(f"Software metadata tag indicates AI generative tool ({software})")
+            elif has_edit:
+                why_doubted.append(
+                    f"Software metadata indicates post-processing editor ({software}); "
+                    f"file was re-saved and pixel forensics may reflect editor rather than direct capture device"
+                )
+            else:
+                make_str = str(hw_cam.get("make", "")).lower()
+                if (
+                    (make_str and make_str in sw_lower)
+                    or any(k in sw_lower for k in ("ver.", "firmware", "ios", "android", "build", "camera", "photo"))
+                ):
+                    why_believed.append(f"Original device firmware / OS metadata present ({software})")
+
+        # 4. Pixel noise profile (non-zero and consistent with sensor size)
+        if arr is not None and arr.size > 0:
+            try:
+                from scipy.ndimage import median_filter
+                lum = 0.299 * arr[:, :, 0] + 0.587 * arr[:, :, 1] + 0.114 * arr[:, :, 2]
+                filtered = median_filter(lum, size=3)
+                residual = lum - filtered
+                noise_std = float(np.std(residual))
+                noise_p75 = float(np.percentile(np.abs(residual), 75))
+
+                if noise_std < 0.6 or noise_p75 < 0.8:
+                    why_doubted.append(
+                        f"Pixel noise profile is near-zero (std={noise_std:.2f}, p75={noise_p75:.2f}), atypical for physical sensor capture"
+                    )
+                elif noise_std >= 1.0 and noise_p75 >= 1.0:
+                    why_believed.append(f"Continuous physical sensor noise profile detected (std={noise_std:.2f})")
+            except Exception as e:
+                logger.debug("Failed to evaluate noise profile in camera corroboration: %s", e)
+
+        # Upgrade / Downgrade Decision:
+        # Upgrade to high only when at least 2 corroborating signals agree and none contradict.
+        # When an EXIF camera is contradicted by pixel evidence, downgrade to low.
+        if why_doubted:
+            confidence = "low"
+        elif len(why_believed) >= 2:
+            confidence = "high"
+        else:
+            confidence = "medium"
+
+        hw_cam["confidence"] = confidence
+        hw_cam["why_believed"] = why_believed
+        hw_cam["why_doubted"] = why_doubted
+
     def detect(
         self,
         arr: np.ndarray,
@@ -703,6 +844,11 @@ class CameraDetector:
                 hw_cam["source"] = "claimed_by_metadata"
                 hw_cam["display_name"] = f"{cam_name} (claimed by metadata)"
                 hw_cam["summary"] = f"{cam_name} (claimed by metadata, contradicted by {dominant_method})"
+                hw_cam.setdefault("why_doubted", []).append(
+                    f"Contradicted by overall image verdict ({dominant_method})"
+                )
+            else:
+                self.corroborate_exif(hw_cam, arr=arr, aspect_ratio=aspect_ratio)
             return hw_cam
 
         # If no hardware EXIF and non-photographic, return non-photo camera profile

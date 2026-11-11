@@ -601,7 +601,7 @@ def camera(
         return
 
     is_claimed = detected.get("claimed_by_metadata", False)
-    is_hw = detected.get("source") == "hardware_exif" and not is_claimed
+    is_hw = detected.get("source") in ("hardware_exif", "exif_metadata") and not is_claimed
     is_detected = detected.get("detected", False)
 
     if is_claimed:
@@ -671,6 +671,13 @@ def camera(
         table.add_row("Forensic Trace", tr)
 
     console.print(table)
+
+    if detected.get("why_believed"):
+        believed_lines = "\n".join(f"[green]✓[/green] {item}" for item in detected["why_believed"])
+        console.print(Panel(believed_lines, title="Corroborating Evidence", expand=False))
+    if detected.get("why_doubted"):
+        doubted_lines = "\n".join(f"[red]⚠️[/red] {item}" for item in detected["why_doubted"])
+        console.print(Panel(doubted_lines, title="Contradictions & Doubts", expand=False))
 
 
 
