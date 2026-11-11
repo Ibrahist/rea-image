@@ -20,6 +20,7 @@ class CameraCraftEstimator:
         aspect_ratio: Optional[str] = None,
         is_photograph: bool = True,
         dominant_method: str = "real photograph",
+        redact_metadata: bool = False,
     ) -> Dict[str, Any]:
         h, w, _ = arr.shape
         lum = (0.299 * arr[:, :, 0] + 0.587 * arr[:, :, 1] + 0.114 * arr[:, :, 2]).astype(np.float32)
@@ -61,6 +62,7 @@ class CameraCraftEstimator:
             path=path,
             is_photograph=is_photograph,
             dominant_method=dominant_method,
+            redact_metadata=redact_metadata,
         )
 
         # If hardware EXIF gave specific aperture / focal length, enhance optical craft

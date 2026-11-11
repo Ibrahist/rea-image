@@ -22,6 +22,19 @@ def _clean_str(val: Any, max_len: int = 200) -> str:
     return s[:max_len]
 
 
+PRIVACY_SENSITIVE_TAGS = {
+    "BodySerialNumber",
+    "CameraSerialNumber",
+    "LensSerialNumber",
+    "SerialNumber",
+    "Artist",
+    "OwnerName",
+    "CameraOwnerName",
+    "GPSLatitude",
+    "GPSLongitude",
+}
+
+
 class ProvenanceDetector(BaseDetector):
     name = "provenance"
 
@@ -186,6 +199,8 @@ class ProvenanceDetector(BaseDetector):
                 return result
             for tag_id, value in exif.items():
                 tag_name = ExifTags.TAGS.get(tag_id, str(tag_id))
+                if tag_name in PRIVACY_SENSITIVE_TAGS:
+                    continue
                 # Decode bytes to string where readable
                 if isinstance(value, bytes):
                     try:
@@ -201,6 +216,8 @@ class ProvenanceDetector(BaseDetector):
                         ifd = exif.get_ifd(ifd_id)
                         for k, v in ifd.items():
                             name = ExifTags.TAGS.get(k, str(k))
+                            if name in PRIVACY_SENSITIVE_TAGS:
+                                continue
                             if isinstance(v, bytes):
                                 try:
                                     v = v.decode("utf-8", errors="replace").strip("\x00")

@@ -28,6 +28,7 @@ def analyze(
     disable: Optional[List[str]] = typer.Option(None, "--disable", "-d", help="Disable specific detector(s) by name."),
     jobs: int = typer.Option(1, "--jobs", "-j", help="Number of parallel worker threads for folder analysis (default: 1)."),
     no_cache: bool = typer.Option(False, "--no-cache", help="Disable intermediate disk caching for this run."),
+    redact_metadata: bool = typer.Option(False, "--redact-metadata", help="Redact capture timestamps and device serial numbers for privacy."),
 ):
     """Analyze one image or a folder of images to reverse-engineer production methods."""
     import csv
@@ -93,6 +94,7 @@ def analyze(
                 agent_review=agent_review,
                 disabled_detectors=disabled_list,
                 no_cache=no_cache,
+                redact_metadata=redact_metadata,
             )
             resolved_dir = target_out or Path(f"./rea_output/{img_path.stem}")
             regions_data = []
@@ -583,13 +585,14 @@ def provenance(
 def camera(
     image: Path = typer.Argument(..., help="Path to image file."),
     json_out: bool = typer.Option(False, "--json", help="Output detected camera parameters as JSON."),
+    redact_metadata: bool = typer.Option(False, "--redact-metadata", help="Redact capture timestamps and device serial numbers for privacy."),
 ):
     """Detect and inspect the physical or inferred camera that captured an image."""
     import tempfile
     from rea_image.report.orchestrator import run_analysis_pipeline
 
     with tempfile.TemporaryDirectory() as tmp_dir:
-        report = run_analysis_pipeline(image_path=image, out_dir=Path(tmp_dir), no_cache=False)
+        report = run_analysis_pipeline(image_path=image, out_dir=Path(tmp_dir), no_cache=False, redact_metadata=redact_metadata)
     detected = getattr(report.global_analysis, "camera", {})
 
     if json_out:

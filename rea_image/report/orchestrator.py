@@ -113,6 +113,7 @@ def run_analysis_pipeline(
     agent_review: bool = False,
     disabled_detectors: Optional[List[str]] = None,
     no_cache: bool = False,
+    redact_metadata: bool = False,
 ) -> ReportSchema:
     """Run full end-to-end rea-image analysis pipeline on target image."""
     img_path = Path(image_path)
@@ -276,6 +277,7 @@ def run_analysis_pipeline(
         path=getattr(ingest_res, "path", None),
         is_photograph=is_photo,
         dominant_method=dominant_method,
+        redact_metadata=redact_metadata,
     )
     camera_info["detected_camera"] = detected_cam
     camera_info["camera_make"] = detected_cam.get("make")

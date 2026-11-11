@@ -5,7 +5,11 @@ import numpy as np
 from PIL import Image, ExifTags
 from typer.testing import CliRunner
 from rea_image.cli import app
-from rea_image.evidence.camera_detector import CameraDetector, classify_camera_device
+from rea_image.evidence.camera_detector import (
+    CameraDetector,
+    classify_camera_device,
+    _format_lens_specification,
+)
 from rea_image.report.orchestrator import run_analysis_pipeline
 
 runner = CliRunner()
@@ -457,3 +461,145 @@ def test_inferred_camera_shoot_plan_class_phrasing(tmp_path: Path):
     )
     assert plan["camera_settings"]["camera"] == "any dedicated camera with 50mm normal lens"
     assert "Camera: any dedicated camera with 50mm normal lens" in plan["gear_list"]
+
+
+def test_apex_values_conversion(tmp_path: Path):
+    """Test converting APEX ApertureValue and ShutterSpeedValue to standard camera notation."""
+    detector = CameraDetector()
+
+    # Case 1: Av = 3.0 -> f = 2^(3/2) = 2.828 -> f/2.8
+    img_path = tmp_path / "apex_3.jpg"
+    img = Image.new("RGB", (100, 100), color=(100, 100, 100))
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Nikon"
+    exif[ExifTags.Base.Model] = "Z 6"
+    exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+    exif_ifd[ExifTags.Base.ApertureValue] = (30, 10)  # APEX Av = 3.0
+    exif_ifd[ExifTags.Base.ShutterSpeedValue] = (80, 10)  # APEX Tv = 8.0 -> 2^(-8) = 1/256s
+    img.save(img_path, "JPEG", exif=exif)
+
+    with Image.open(img_path) as loaded:
+        hw = detector.extract_hardware_exif(img=loaded, path=img_path)
+    assert hw is not None
+    assert hw["aperture"] == "f/2.8"
+    assert hw["shutter_speed"] in ("1/256s", "1/250s")
+
+    # Case 2: Av = 5.0 -> f = 2^(5/2) = 5.657 -> f/5.6
+    img_path2 = tmp_path / "apex_5.jpg"
+    img2 = Image.new("RGB", (100, 100), color=(100, 100, 100))
+    exif2 = img2.getexif()
+    exif2[ExifTags.Base.Make] = "Nikon"
+    exif2[ExifTags.Base.Model] = "Z 6"
+    exif_ifd2 = exif2.get_ifd(ExifTags.IFD.Exif)
+    exif_ifd2[ExifTags.Base.ApertureValue] = (50, 10)  # APEX Av = 5.0
+    exif_ifd2[ExifTags.Base.ShutterSpeedValue] = (0, 1)  # APEX Tv = 0 -> 1.0s
+    img2.save(img_path2, "JPEG", exif=exif2)
+
+    with Image.open(img_path2) as loaded:
+        hw2 = detector.extract_hardware_exif(img=loaded, path=img_path2)
+    assert hw2 is not None
+    assert hw2["aperture"] == "f/5.7" or hw2["aperture"] == "f/5.6"
+    assert hw2["shutter_speed"] == "1s"
+
+
+def test_lens_model_make_and_specification(tmp_path: Path):
+    """Test combining LensMake + LensModel and formatting LensSpecification."""
+    detector = CameraDetector()
+
+    # Case 1: Combine LensMake + LensModel
+    img_path = tmp_path / "lens_combine.jpg"
+    img = Image.new("RGB", (100, 100), color=(100, 100, 100))
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Canon"
+    exif[ExifTags.Base.Model] = "EOS 5D Mark IV"
+    exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+    exif_ifd[ExifTags.Base.LensMake] = "Canon"
+    exif_ifd[ExifTags.Base.LensModel] = "EF 50mm f/1.8 STM"
+    img.save(img_path, "JPEG", exif=exif)
+
+    with Image.open(img_path) as loaded:
+        hw = detector.extract_hardware_exif(img=loaded, path=img_path)
+    assert hw is not None
+    assert hw["lens"] == "Canon EF 50mm f/1.8 STM"
+
+    # Case 2: Missing LensModel, format LensSpecification
+    assert _format_lens_specification(((24, 1), (70, 1), (28, 10), (28, 10)), "Canon") == "Canon 24-70mm f/2.8"
+    assert _format_lens_specification(((50, 1), (50, 1), (18, 10), (18, 10)), None) == "50mm f/1.8"
+    assert _format_lens_specification(((18, 1), (55, 1), (35, 10), (56, 10)), "Nikon") == "Nikon 18-55mm f/3.5-5.6"
+
+    # Case 3: Verify extract_hardware_exif formats LensSpecification
+    from unittest.mock import MagicMock
+    mock_img = MagicMock()
+    mock_exif = {
+        ExifTags.Base.Make: "Canon",
+        ExifTags.Base.Model: "EOS 5D Mark IV",
+    }
+    mock_ifd = {
+        ExifTags.Base.LensMake: "Canon",
+        ExifTags.Base.LensSpecification: ((24, 1), (70, 1), (28, 10), (28, 10)),
+    }
+    mock_exif_obj = MagicMock()
+    mock_exif_obj.items.return_value = mock_exif.items()
+    mock_exif_obj.get_ifd.return_value = mock_ifd
+    mock_img.getexif.return_value = mock_exif_obj
+
+    hw2 = detector.extract_hardware_exif(img=mock_img, path=None)
+    assert hw2 is not None
+    assert hw2["lens"] == "Canon 24-70mm f/2.8"
+
+
+def test_privacy_serial_number_filtering(tmp_path: Path):
+    """Test device serial numbers and owner names are stripped from hardware EXIF."""
+    detector = CameraDetector()
+
+    img_path = tmp_path / "privacy.jpg"
+    img = Image.new("RGB", (100, 100), color=(100, 100, 100))
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Sony"
+    exif[ExifTags.Base.Model] = "ILCE-7M4"
+    exif[ExifTags.Base.Artist] = "John Doe Photographer"
+
+    exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+    exif_ifd[ExifTags.Base.BodySerialNumber] = "SN-987654321"
+    exif_ifd[ExifTags.Base.LensSerialNumber] = "LENS-123456"
+    exif_ifd[ExifTags.Base.CameraOwnerName] = "Private User"
+    img.save(img_path, "JPEG", exif=exif)
+
+    with Image.open(img_path) as loaded:
+        hw = detector.extract_hardware_exif(img=loaded, path=img_path)
+    assert hw is not None
+    # Verify no serial numbers or names appear in any key or summary string
+    for val in hw.values():
+        val_str = str(val)
+        assert "987654321" not in val_str
+        assert "LENS-123456" not in val_str
+        assert "John Doe" not in val_str
+        assert "Private User" not in val_str
+
+
+def test_cli_redact_metadata_flag(tmp_path: Path):
+    """Test --redact-metadata flag strips capture timestamps."""
+    img_path = tmp_path / "timestamp_shot.jpg"
+    rng = np.random.default_rng(42)
+    arr = rng.normal(128, 25, (200, 300, 3)).clip(0, 255).astype(np.uint8)
+    img = Image.fromarray(arr)
+
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Sony"
+    exif[ExifTags.Base.Model] = "ILCE-7M4"
+    exif[ExifTags.Base.DateTime] = "2024:06:15 14:30:00"
+
+    exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+    exif_ifd[ExifTags.Base.DateTimeOriginal] = "2024:06:15 14:30:00"
+    img.save(img_path, "JPEG", exif=exif)
+
+    # 1. Normal run has capture timestamp
+    res_normal = runner.invoke(app, ["camera", str(img_path)])
+    assert res_normal.exit_code == 0
+    assert "2024:06:15 14:30:00" in res_normal.output
+
+    # 2. Redacted run has no capture timestamp
+    res_redacted = runner.invoke(app, ["camera", str(img_path), "--redact-metadata"])
+    assert res_redacted.exit_code == 0
+    assert "2024:06:15 14:30:00" not in res_redacted.output
+    assert "Capture Timestamp" not in res_redacted.output

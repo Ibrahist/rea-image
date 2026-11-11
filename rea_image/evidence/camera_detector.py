@@ -8,6 +8,7 @@ sensor-size depth-of-field constraints, and unsharp masking edge halo forensics.
 
 from fractions import Fraction
 import logging
+import math
 from pathlib import Path
 import re
 from typing import Any, Dict, List, Optional
@@ -117,6 +118,79 @@ def _format_exposure_time(val: Any) -> Optional[str]:
         return f"1/{reciprocal}s"
     except Exception:
         return f"{num_val:.4f}s"
+
+
+def _convert_apex_aperture(val: Any) -> Optional[float]:
+    """Convert APEX ApertureValue (Av) to f-number: f = 2^(Av / 2)."""
+    av = _format_rational(val)
+    if av is None:
+        return None
+    try:
+        f_val = math.pow(2.0, av / 2.0)
+        return round(f_val, 1)
+    except Exception:
+        return None
+
+
+def _convert_apex_shutter(val: Any) -> Optional[float]:
+    """Convert APEX ShutterSpeedValue (Tv) to exposure time: t = 2^(-Tv)."""
+    tv = _format_rational(val)
+    if tv is None:
+        return None
+    try:
+        exp_time = math.pow(2.0, -tv)
+        return exp_time
+    except Exception:
+        return None
+
+
+def _format_lens_specification(spec_raw: Any, lens_make: str = "") -> Optional[str]:
+    """Format LensSpecification 4 rationals (min_focal, max_focal, min_fnum, max_fnum)."""
+    if not spec_raw or not isinstance(spec_raw, (list, tuple)) or len(spec_raw) < 4:
+        return None
+    try:
+        min_f = _format_rational(spec_raw[0])
+        max_f = _format_rational(spec_raw[1])
+        min_fn = _format_rational(spec_raw[2])
+        max_fn = _format_rational(spec_raw[3])
+
+        parts = []
+        if lens_make:
+            parts.append(lens_make)
+
+        if min_f and max_f:
+            if abs(min_f - max_f) < 0.1:
+                parts.append(f"{min_f:g}mm")
+            else:
+                parts.append(f"{min_f:g}-{max_f:g}mm")
+        elif min_f:
+            parts.append(f"{min_f:g}mm")
+
+        if min_fn and max_fn:
+            if abs(min_fn - max_fn) < 0.05:
+                parts.append(f"f/{min_fn:g}")
+            else:
+                parts.append(f"f/{min_fn:g}-{max_fn:g}")
+        elif min_fn:
+            parts.append(f"f/{min_fn:g}")
+
+        return " ".join(parts).strip() if parts else None
+    except Exception:
+        return None
+
+
+PRIVACY_SENSITIVE_TAGS = {
+    "BodySerialNumber",
+    "CameraSerialNumber",
+    "LensSerialNumber",
+    "SerialNumber",
+    "Artist",
+    "OwnerName",
+    "CameraOwnerName",
+    "GPSInfo",
+    "GPSLatitude",
+    "GPSLongitude",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -290,9 +364,15 @@ class CameraDetector:
         self,
         img: Optional[Image.Image] = None,
         path: Optional[Path] = None,
+        redact_metadata: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Extract camera hardware metadata from EXIF stream."""
         exif_dict: Dict[str, Any] = {}
+
+        def _add_tag(k: Any, v: Any):
+            tag = ExifTags.TAGS.get(k, str(k))
+            if tag not in PRIVACY_SENSITIVE_TAGS:
+                exif_dict[tag] = v
 
         # 1. Read EXIF from PIL Image instance
         if img is not None:
@@ -300,18 +380,15 @@ class CameraDetector:
                 raw_exif = img.getexif()
                 if raw_exif:
                     for k, v in raw_exif.items():
-                        tag = ExifTags.TAGS.get(k, str(k))
-                        exif_dict[tag] = v
+                        _add_tag(k, v)
 
-                    # Check Exif IFD sub-dictionaries
-                    for ifd_id in (ExifTags.IFD.Exif, ExifTags.IFD.GPSInfo):
-                        try:
-                            ifd = raw_exif.get_ifd(ifd_id)
-                            for k, v in ifd.items():
-                                tag = ExifTags.TAGS.get(k, str(k))
-                                exif_dict[tag] = v
-                        except Exception:
-                            pass
+                    # Check Exif IFD sub-dictionaries (skip GPSInfo for privacy)
+                    try:
+                        ifd = raw_exif.get_ifd(ExifTags.IFD.Exif)
+                        for k, v in ifd.items():
+                            _add_tag(k, v)
+                    except Exception:
+                        pass
             except Exception as e:
                 logger.debug("Failed to read EXIF from image object: %s", e)
 
@@ -324,16 +401,13 @@ class CameraDetector:
                         raw_exif = disk_img.getexif()
                         if raw_exif:
                             for k, v in raw_exif.items():
-                                tag = ExifTags.TAGS.get(k, str(k))
-                                exif_dict[tag] = v
-                            for ifd_id in (ExifTags.IFD.Exif, ExifTags.IFD.GPSInfo):
-                                try:
-                                    ifd = raw_exif.get_ifd(ifd_id)
-                                    for k, v in ifd.items():
-                                        tag = ExifTags.TAGS.get(k, str(k))
-                                        exif_dict[tag] = v
-                                except Exception:
-                                    pass
+                                _add_tag(k, v)
+                            try:
+                                ifd = raw_exif.get_ifd(ExifTags.IFD.Exif)
+                                for k, v in ifd.items():
+                                    _add_tag(k, v)
+                            except Exception:
+                                pass
             except Exception as e:
                 logger.debug("Failed to read EXIF from file path %s: %s", path, e)
 
@@ -343,18 +417,46 @@ class CameraDetector:
         if not make and not model:
             return None
 
-        # Lens and optical tags
-        lens = _clean_str(exif_dict.get("LensModel") or exif_dict.get("LensMake") or exif_dict.get("LensSpecification"))
+        # Lens and optical tags: combine LensMake + LensModel, or format LensSpecification
+        lens_model = _clean_str(exif_dict.get("LensModel"))
+        lens_make = _clean_str(exif_dict.get("LensMake"))
+        lens_spec = exif_dict.get("LensSpecification")
+
+        lens = None
+        if lens_model:
+            if lens_make and not lens_model.lower().startswith(lens_make.lower()):
+                lens = f"{lens_make} {lens_model}".strip()
+            else:
+                lens = lens_model
+        elif lens_spec:
+            lens = _format_lens_specification(lens_spec, lens_make)
+        elif lens_make:
+            lens = lens_make
+
         focal_raw = _format_rational(exif_dict.get("FocalLength"))
         focal_35_raw = _format_rational(exif_dict.get("FocalLengthIn35mmFilm"))
-        aperture_raw = _format_rational(exif_dict.get("FNumber") or exif_dict.get("ApertureValue"))
-        shutter_str = _format_exposure_time(exif_dict.get("ExposureTime") or exif_dict.get("ShutterSpeedValue"))
+
+        # APEX conversion for aperture: f = 2^(Av / 2)
+        fnumber = _format_rational(exif_dict.get("FNumber"))
+        if fnumber is not None and fnumber > 0:
+            aperture_val = fnumber
+        else:
+            aperture_val = _convert_apex_aperture(exif_dict.get("ApertureValue"))
+
+        # APEX conversion for shutter: t = 2^(-Tv)
+        exp_time = _format_rational(exif_dict.get("ExposureTime"))
+        if exp_time is not None and exp_time > 0:
+            shutter_str = _format_exposure_time(exp_time)
+        else:
+            apex_shutter = _convert_apex_shutter(exif_dict.get("ShutterSpeedValue"))
+            shutter_str = _format_exposure_time(apex_shutter) if apex_shutter else None
+
         iso = exif_dict.get("ISOSpeedRatings") or exif_dict.get("PhotographicSensitivity")
         if isinstance(iso, (list, tuple)) and iso:
             iso = iso[0]
 
         software = _clean_str(exif_dict.get("Software") or exif_dict.get("HostComputer"))
-        date_time = _clean_str(exif_dict.get("DateTimeOriginal") or exif_dict.get("DateTime"))
+        date_time = None if redact_metadata else _clean_str(exif_dict.get("DateTimeOriginal") or exif_dict.get("DateTime"))
 
         # Flash
         flash_raw = exif_dict.get("Flash")
@@ -397,7 +499,7 @@ class CameraDetector:
         # Build clean formatted strings
         focal_str = f"{focal_raw:.1f}mm" if focal_raw else None
         focal_35_str = f"{int(focal_35_raw)}mm" if focal_35_raw else None
-        aperture_str = f"f/{aperture_raw:.1f}" if aperture_raw else None
+        aperture_str = f"f/{aperture_val:.1f}" if aperture_val else None
 
         summary_parts = [classification["display_name"]]
         specs = []
@@ -581,9 +683,10 @@ class CameraDetector:
         path: Optional[Path] = None,
         is_photograph: bool = True,
         dominant_method: str = "real photograph",
+        redact_metadata: bool = False,
     ) -> Dict[str, Any]:
         """Execute end-to-end camera detection: hardware EXIF first, then optical forensics."""
-        hw_cam = self.extract_hardware_exif(img=img, path=path)
+        hw_cam = self.extract_hardware_exif(img=img, path=path, redact_metadata=redact_metadata)
         if hw_cam is not None:
             # Augment with optical craft signatures
             hw_cam["optical_signatures"] = {
