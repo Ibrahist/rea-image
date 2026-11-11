@@ -317,7 +317,13 @@ def run_analysis_pipeline(
     camera_info["display_name"] = detected_cam.get("display_name")
 
     if detected_cam.get("claimed_by_metadata"):
-        cam_name = f"{detected_cam.get('make', '')} {detected_cam.get('model', '')}".strip() or "Camera"
+        cam_name = detected_cam.get("display_name", "")
+        if cam_name.endswith(" (claimed by metadata)"):
+            cam_name = cam_name[:-len(" (claimed by metadata)")].strip()
+        if not cam_name:
+            make = detected_cam.get("make", "").strip()
+            model = detected_cam.get("model", "").strip()
+            cam_name = model if model.lower().startswith(make.lower()) else f"{make} {model}".strip() or "Camera"
         all_needs_review.append(
             NeedsReviewItem(
                 region_id="global",

@@ -113,7 +113,10 @@ class ProvenanceDetector(BaseDetector):
                 iso_raw = iso_raw[0]
             iso = int(iso_raw) if (iso_raw is not None and str(iso_raw).isdigit()) else (iso_raw if iso_raw is not None else None)
 
-            cam_str = f"{make} {model}".strip()
+            if model and make and model.lower().startswith(make.lower()):
+                cam_str = model
+            else:
+                cam_str = f"{make} {model}".strip() or "Camera"
             details = []
             if lens:
                 details.append(f"lens {lens}")

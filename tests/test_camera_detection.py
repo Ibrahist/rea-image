@@ -985,3 +985,66 @@ def test_evidence_item_safe_by_default():
     item.value = {"mutated_rat": IFDRational(1, 1000)}
     dumped2 = item.model_dump(mode="json")
     assert dumped2["value"]["mutated_rat"] == 0.001
+
+
+def test_camera_display_name_no_repeated_make(tmp_path: Path):
+    """Test that models already starting with make don't duplicate make in display_name or metadata claims."""
+    # 1. Direct classification
+    canon_cam = classify_camera_device("Canon", "Canon EOS R6")
+    assert canon_cam["display_name"] == "Canon EOS R6"
+    assert "Canon Canon" not in canon_cam["display_name"]
+
+    nikon_cam = classify_camera_device("Nikon", "NIKON D850")
+    assert nikon_cam["display_name"] == "NIKON D850"
+    assert "Nikon NIKON" not in nikon_cam["display_name"]
+
+    # 2. CameraDetector metadata-claim path (non-photograph)
+    detector = CameraDetector()
+    img = Image.new("RGB", (200, 200), color=(100, 150, 200))
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Canon"
+    exif[ExifTags.Base.Model] = "Canon EOS R6"
+
+    synthetic_arr = np.full((200, 200, 3), 128, dtype=np.uint8)
+    detected = detector.detect(
+        arr=synthetic_arr,
+        aspect_ratio="1:1",
+        optical_craft={},
+        img=img,
+        path=None,
+        is_photograph=False,
+        dominant_method="vector or graphic design",
+    )
+    assert detected["claimed_by_metadata"] is True
+    assert detected["display_name"] == "Canon EOS R6 (claimed by metadata)"
+    assert "Canon Canon" not in detected["display_name"]
+    assert "Canon Canon" not in detected["summary"]
+
+    # 3. Full pipeline run on an AI-marked image with Canon EOS R6
+    from PIL import PngImagePlugin
+
+    png_path = tmp_path / "ai_canon_test.png"
+    meta = PngImagePlugin.PngInfo()
+    meta.add_text("parameters", "Cyberpunk street, Unreal Engine 5 render, highly detailed")
+    img.save(png_path, "PNG", pnginfo=meta, exif=exif)
+
+    out_dir = tmp_path / "ai_canon_out"
+    report = run_analysis_pipeline(png_path, out_dir=out_dir, no_cache=True)
+    cam = report.global_analysis.camera
+
+    assert cam["display_name"] == "Canon EOS R6 (claimed by metadata)"
+    assert "Canon Canon" not in cam["display_name"]
+    assert "Canon Canon" not in cam["summary"]
+
+    # Verify needs_review doesn't repeat make
+    claim_review = next(
+        (r for r in report.needs_review if "metadata claims" in r.reason),
+        None,
+    )
+    assert claim_review is not None
+    assert "Canon EOS R6" in claim_review.reason
+    assert "Canon Canon" not in claim_review.reason
+
+    # Verify report.html doesn't contain repeated make
+    html_text = (out_dir / "report.html").read_text(encoding="utf-8")
+    assert "Canon Canon" not in html_text

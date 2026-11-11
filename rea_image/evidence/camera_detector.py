@@ -933,7 +933,19 @@ class CameraDetector:
                 "chromatic_aberration": optical_craft.get("chromatic_aberration"),
             }
             if not is_photograph:
-                cam_name = f"{hw_cam.get('make', '')} {hw_cam.get('model', '')}".strip() or "Camera"
+                cam_name = hw_cam.get("display_name")
+                if not cam_name:
+                    make = hw_cam.get("make", "").strip()
+                    model = hw_cam.get("model", "").strip()
+                    if model.lower().startswith(make.lower()):
+                        cam_name = model
+                    else:
+                        cam_name = f"{make} {model}".strip() or "Camera"
+                if cam_name.endswith(" (claimed by metadata)"):
+                    cam_name = cam_name[:-len(" (claimed by metadata)")].strip()
+                make = hw_cam.get("make", "").strip()
+                if make and cam_name.lower().startswith(f"{make.lower()} {make.lower()}"):
+                    cam_name = cam_name[len(make):].strip()
                 hw_cam["claimed_by_metadata"] = True
                 hw_cam["confidence"] = "low"
                 hw_cam["source"] = "claimed_by_metadata"
