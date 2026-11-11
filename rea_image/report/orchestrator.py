@@ -21,6 +21,7 @@ from rea_image.evidence import (
     analyze_layout_grid,
     get_active_detectors,
 )
+from rea_image.evidence.camera_detector import CameraDetector
 from rea_image.judge import JudgmentEngine, VerdictAggregator
 from rea_image.reverse import (
     PromptBuilder,
@@ -252,6 +253,48 @@ def run_analysis_pipeline(
         all_needs_review.extend(review_items)
         region_analyses.append(reg_analysis)
 
+    # Aggregate whole-image verdict
+    aggregator = VerdictAggregator()
+    verdict, change_statement = aggregator.aggregate(
+        regions=region_analyses,
+        global_evidence=global_evidence,
+        aspect_ratio=ingest_res.metadata.aspect_ratio,
+        width=w,
+        height=h,
+        color_grade=color_grade,
+    )
+    dominant_method = verdict.dominant_method
+    is_photo = (dominant_method == ProductionMethod.REAL_PHOTO.value)
+
+    # Resolve camera hardware/optical forensics gated on photograph verdict
+    cam_detector = CameraDetector()
+    detected_cam = cam_detector.detect(
+        arr=arr,
+        aspect_ratio=ingest_res.metadata.aspect_ratio,
+        optical_craft=camera_info,
+        img=getattr(ingest_res, "rgb_image", None),
+        path=getattr(ingest_res, "path", None),
+        is_photograph=is_photo,
+        dominant_method=dominant_method,
+    )
+    camera_info["detected_camera"] = detected_cam
+    camera_info["camera_make"] = detected_cam.get("make")
+    camera_info["camera_model"] = detected_cam.get("model")
+    camera_info["camera_type"] = detected_cam.get("device_type")
+    camera_info["camera_sensor"] = detected_cam.get("sensor_format")
+    camera_info["camera_summary"] = detected_cam.get("summary")
+    camera_info["display_name"] = detected_cam.get("display_name")
+
+    if detected_cam.get("claimed_by_metadata"):
+        cam_name = f"{detected_cam.get('make', '')} {detected_cam.get('model', '')}".strip() or "Camera"
+        all_needs_review.append(
+            NeedsReviewItem(
+                region_id="global",
+                reason=f"metadata claims {cam_name}, pixels indicate {dominant_method}",
+                question_for_agent=f"Examine whether {cam_name} metadata was copied/spoofed on an image produced via {dominant_method}.",
+            )
+        )
+
     # Stage 5 & 6: Reverse Engineering & Replication Planning
     prompt_builder = PromptBuilder()
     shoot_planner = PhotoShootPlanner()
@@ -265,6 +308,7 @@ def run_analysis_pipeline(
         lighting_info=lighting_info.model_dump(),
         color_info=color_grade,
         aspect_ratio=ingest_res.metadata.aspect_ratio,
+        is_photograph=is_photo,
     )
     blender_script = render_builder.build_blender_script(
         scene_name=img_path.stem,
@@ -295,17 +339,6 @@ def run_analysis_pipeline(
             aspect_ratio=ingest_res.metadata.aspect_ratio,
         )
 
-    # Aggregate whole-image verdict
-    aggregator = VerdictAggregator()
-    verdict, change_statement = aggregator.aggregate(
-        regions=region_analyses,
-        global_evidence=global_evidence,
-        aspect_ratio=ingest_res.metadata.aspect_ratio,
-        width=w,
-        height=h,
-        color_grade=color_grade,
-    )
-
     # Global analysis container
     global_analysis = GlobalAnalysis(
         metadata=ingest_res.metadata.model_dump(),
@@ -317,7 +350,7 @@ def run_analysis_pipeline(
         color_grade=color_grade,
         typography=typography.model_dump(),
         layout_grid=layout_grid,
-        camera=camera_info.get("detected_camera", {}),
+        camera=detected_cam,
     )
 
     limitations = [

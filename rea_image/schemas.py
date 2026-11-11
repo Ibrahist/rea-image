@@ -56,6 +56,10 @@ class Verdict(BaseModel):
     confidence: str
     method_breakdown: List[MethodBreakdownItem] = Field(default_factory=list)
 
+    @property
+    def dominant_method(self) -> str:
+        return self.method_breakdown[0].method if self.method_breakdown else ProductionMethod.REAL_PHOTO.value
+
 
 class PaletteColor(BaseModel):
     hex: str

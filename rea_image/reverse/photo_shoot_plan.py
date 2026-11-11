@@ -90,6 +90,7 @@ class PhotoShootPlanner:
         color_info: Dict[str, Any],
         aspect_ratio: str = "3:2",
         subject_is_human: bool = False,
+        is_photograph: bool = True,
     ) -> Dict[str, Any]:
         setup_name = (
             lighting_info.get("matched_setup")
@@ -139,17 +140,28 @@ class PhotoShootPlanner:
 
         # Camera & lens settings
         det_cam = camera_info.get("detected_camera") or {}
-        cam_body = (
-            camera_info.get("camera_summary")
-            or camera_info.get("display_name")
-            or det_cam.get("summary")
-            or det_cam.get("display_name")
-            or "Dedicated Mirrorless / DSLR or modern smartphone camera"
-        )
         focal = det_cam.get("lens") or camera_info.get("estimated_focal_length") or "50mm normal lens"
         aperture = det_cam.get("aperture") or camera_info.get("estimated_aperture") or "f/2.8"
         focal_class = camera_info.get("focal_length_class", "").lower()
         is_telephoto = "telephoto" in focal_class or "telephoto" in str(focal).lower()
+
+        # Build camera description only if image is a real photograph
+        if is_photograph and det_cam.get("detected", False) and not det_cam.get("claimed_by_metadata"):
+            if det_cam.get("source") in ("hardware_exif", "exif_metadata"):
+                cam_body = det_cam.get("summary") or det_cam.get("display_name") or "Standard DSLR / Mirrorless camera"
+            else:
+                dev_class = det_cam.get("device_type_label", "").lower()
+                if "smartphone" in dev_class:
+                    cam_body = f"any smartphone camera with {focal}"
+                else:
+                    cam_body = f"any dedicated camera with {focal}"
+            gear_list = [f"Camera: {cam_body}"]
+        elif is_photograph:
+            cam_body = f"any dedicated camera with {focal}"
+            gear_list = [f"Camera: {cam_body}"]
+        else:
+            cam_body = None
+            gear_list = []
 
         # Shutter speed suited to the scene (use actual hardware settings if available)
         if det_cam.get("shutter_speed"):
@@ -175,29 +187,31 @@ class PhotoShootPlanner:
             iso = "ISO 100 - 400"
 
         # Gear list
-        gear_list = [f"Camera: {cam_body}"]
         gear_list.extend(lighting_info.get("suggested_gear") or lighting_info.get("gear") or [])
         if is_outdoor:
-            if not gear_list:
+            if not gear_list and is_photograph:
                 gear_list = [
                     "Natural ambient sunlight",
                     "Foldable 5-in-1 reflector (gold or silver/white)",
                     "Lens hood to control direct sun flare",
                 ]
-            gear_list.append(f"Camera body paired with {focal}")
-            gear_list.append("Monopod or handheld camera strap for mobility")
+            if is_photograph:
+                gear_list.append(f"Camera body paired with {focal}")
+                gear_list.append("Monopod or handheld camera strap for mobility")
         elif is_studio:
-            if not gear_list:
+            if not gear_list and is_photograph:
                 gear_list = [
                     "Key strobe with softbox or beauty dish",
                     "White bounce reflector fill",
                     "Wireless flash trigger transmitter",
                 ]
-            gear_list.append(f"Camera body paired with {focal}")
-            gear_list.append("Heavy-duty studio tripod and light stands")
+            if is_photograph:
+                gear_list.append(f"Camera body paired with {focal}")
+                gear_list.append("Heavy-duty studio tripod and light stands")
         else:
-            gear_list.append(f"Camera body paired with {focal}")
-            gear_list.append("Handheld stabilization or travel tripod")
+            if is_photograph:
+                gear_list.append(f"Camera body paired with {focal}")
+                gear_list.append("Handheld stabilization or travel tripod")
 
         # Post-processing pipeline
         split_toning = color_info.get("split_toning", "neutral")
@@ -220,10 +234,10 @@ class PhotoShootPlanner:
             "location": location,
             "camera_settings": {
                 "camera": cam_body,
-                "lens": focal,
-                "aperture": aperture,
-                "shutter_speed": shutter,
-                "iso": iso,
+                "lens": focal if is_photograph else None,
+                "aperture": aperture if is_photograph else None,
+                "shutter_speed": shutter if is_photograph else None,
+                "iso": iso if is_photograph else None,
             },
             "lighting_diagram": diagram.strip(),
             "gear_list": gear_list,

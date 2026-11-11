@@ -91,18 +91,24 @@ def export_assets_bundle(
         shoot_md_lines = [
             "# Photo Shoot Plan & Production Notes\n",
             f"**Location**: {shoot_plan_data.get('location', 'Studio')}\n",
-            "## Camera Settings",
-            f"- Camera: {shoot_plan_data.get('camera_settings', {}).get('camera', 'Standard DSLR / Mirrorless')}",
-            f"- Lens: {shoot_plan_data.get('camera_settings', {}).get('lens', '50mm')}",
-            f"- Aperture: {shoot_plan_data.get('camera_settings', {}).get('aperture', 'f/2.8')}",
-            f"- Shutter: {shoot_plan_data.get('camera_settings', {}).get('shutter_speed', '1/160s')}",
-            f"- ISO: {shoot_plan_data.get('camera_settings', {}).get('iso', '100')}\n",
+        ]
+        cam_setting = shoot_plan_data.get("camera_settings", {}).get("camera")
+        if cam_setting:
+            shoot_md_lines.extend([
+                "## Camera Settings",
+                f"- Camera: {cam_setting}",
+                f"- Lens: {shoot_plan_data.get('camera_settings', {}).get('lens', '50mm')}",
+                f"- Aperture: {shoot_plan_data.get('camera_settings', {}).get('aperture', 'f/2.8')}",
+                f"- Shutter: {shoot_plan_data.get('camera_settings', {}).get('shutter_speed', '1/160s')}",
+                f"- ISO: {shoot_plan_data.get('camera_settings', {}).get('iso', '100')}\n",
+            ])
+        shoot_md_lines.extend([
             "## ASCII Lighting Diagram",
             "```text",
             shoot_plan_data.get("lighting_diagram", ""),
             "```\n",
             "## Suggested Gear List",
-        ]
+        ])
         for g in shoot_plan_data.get("gear_list", []):
             shoot_md_lines.append(f"- {g}")
 

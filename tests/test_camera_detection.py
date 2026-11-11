@@ -157,7 +157,9 @@ def test_inferred_optical_camera_detection():
 def test_cli_camera_command(tmp_path: Path):
     """Test 'rea-image camera' CLI subcommand in both Rich table and JSON mode."""
     img_path = tmp_path / "phone_shot.jpg"
-    img = Image.new("RGB", (400, 300), color=(150, 180, 200))
+    rng = np.random.default_rng(42)
+    arr = rng.normal(128, 25, (300, 400, 3)).clip(0, 255).astype(np.uint8)
+    img = Image.fromarray(arr)
 
     exif = img.getexif()
     exif[ExifTags.Base.Make] = "Apple"
@@ -193,7 +195,9 @@ def test_cli_camera_command(tmp_path: Path):
 def test_report_orchestrator_includes_detected_camera(tmp_path: Path):
     """Test full analysis orchestrator populates camera in global analysis and report.html."""
     img_path = tmp_path / "report_cam.jpg"
-    img = Image.new("RGB", (300, 200), color=(140, 160, 120))
+    rng = np.random.default_rng(42)
+    arr = rng.normal(128, 25, (200, 300, 3)).clip(0, 255).astype(np.uint8)
+    img = Image.fromarray(arr)
 
     exif = img.getexif()
     exif[ExifTags.Base.Make] = "Canon"
@@ -227,3 +231,91 @@ def test_report_orchestrator_includes_detected_camera(tmp_path: Path):
     # Check shoot plan includes detected camera
     shoot_plan = (out_dir / "recreate" / "shoot_plan.md").read_text(encoding="utf-8")
     assert "Canon EOS R5" in shoot_plan
+
+
+def test_camera_detection_non_photographic(tmp_path: Path):
+    """Test non-photographs report 'No physical camera' and omit camera lines from shoot plan."""
+    ai_img = Path("eval/benchmark_data/images/ai_original.png")
+    if not ai_img.exists():
+        return
+
+    out_dir = tmp_path / "ai_cam_out"
+    report = run_analysis_pipeline(ai_img, out_dir=out_dir, no_cache=True)
+
+    cam = report.global_analysis.camera
+    assert cam.get("detected") is False
+    assert cam.get("summary") == "No physical camera (non-photographic image)"
+    assert cam.get("display_name") == "No Physical Camera Detected"
+
+    # Verify shoot plan has no camera lines
+    shoot_plan = (out_dir / "recreate" / "shoot_plan.md").read_text(encoding="utf-8")
+    assert "## Camera Settings" not in shoot_plan
+    assert "Camera:" not in shoot_plan
+
+
+def test_camera_exif_on_ai_image_conflict(tmp_path: Path):
+    """Test camera EXIF on an AI-generated image produces a 'claimed by metadata' conflict."""
+    from PIL import PngImagePlugin
+
+    img_path = tmp_path / "ai_with_exif.png"
+    img = Image.new("RGB", (300, 300), color=(120, 140, 160))
+
+    # Add AI PNG chunk metadata to force AI verdict
+    meta = PngImagePlugin.PngInfo()
+    meta.add_text("parameters", "A cinematic portrait of an astronaut, masterwork, Unreal Engine 5 render, highly detailed")
+
+    # Add hardware camera EXIF
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Nikon"
+    exif[ExifTags.Base.Model] = "NIKON D850"
+
+    img.save(img_path, "PNG", pnginfo=meta, exif=exif)
+
+    out_dir = tmp_path / "ai_exif_out"
+    report = run_analysis_pipeline(img_path, out_dir=out_dir, no_cache=True)
+
+    cam = report.global_analysis.camera
+    assert cam.get("claimed_by_metadata") is True
+    assert cam.get("confidence") == "low"
+    assert "claimed by metadata" in cam.get("display_name", "").lower()
+    assert "claimed by metadata" in cam.get("summary", "").lower()
+
+    # Verify conflict added to needs_review
+    conflict_found = any(
+        "metadata claims" in r.reason and "pixels indicate" in r.reason
+        for r in report.needs_review
+    )
+    assert conflict_found, f"Needs review conflict missing from {report.needs_review}"
+
+    # Verify shoot plan omits camera body
+    shoot_plan = (out_dir / "recreate" / "shoot_plan.md").read_text(encoding="utf-8")
+    assert "## Camera Settings" not in shoot_plan
+    assert "Camera: NIKON D850" not in shoot_plan
+
+
+def test_inferred_camera_shoot_plan_class_phrasing(tmp_path: Path):
+    """Test camera in shoot plan is phrased as a class for inferred cameras on real photographs."""
+    from rea_image.reverse.photo_shoot_plan import PhotoShootPlanner
+
+    planner = PhotoShootPlanner()
+    camera_info = {
+        "detected_camera": {
+            "detected": True,
+            "source": "optical_forensics",
+            "device_type_label": "Dedicated Mirrorless / DSLR Camera",
+            "summary": "Inferred: Likely Dedicated Camera",
+        },
+        "estimated_focal_length": "50mm normal lens",
+        "estimated_aperture": "f/1.8",
+    }
+    lighting_info = {"matched_setup": "Window light"}
+    color_info = {"split_toning": "neutral"}
+
+    plan = planner.plan(
+        camera_info=camera_info,
+        lighting_info=lighting_info,
+        color_info=color_info,
+        is_photograph=True,
+    )
+    assert plan["camera_settings"]["camera"] == "any dedicated camera with 50mm normal lens"
+    assert "Camera: any dedicated camera with 50mm normal lens" in plan["gear_list"]

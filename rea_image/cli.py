@@ -585,27 +585,39 @@ def camera(
     json_out: bool = typer.Option(False, "--json", help="Output detected camera parameters as JSON."),
 ):
     """Detect and inspect the physical or inferred camera that captured an image."""
-    from rea_image.ingest.loader import load_image
-    from rea_image.evidence.craft_camera import CameraCraftEstimator
-    from rea_image.evidence.generator_traces import GeneratorTracesDetector
+    import tempfile
+    from rea_image.report.orchestrator import run_analysis_pipeline
 
-    res = load_image(image)
-    gen_items = GeneratorTracesDetector().run(res)
-    is_photo = not any("ai" in it.direction.lower() for it in gen_items)
-    cam_info = CameraCraftEstimator().estimate(res.rgb_array, ingest_res=res, is_photograph=is_photo)
-    detected = cam_info.get("detected_camera", {})
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        report = run_analysis_pipeline(image_path=image, out_dir=Path(tmp_dir), no_cache=False)
+    detected = getattr(report.global_analysis, "camera", {})
 
     if json_out:
         import json
         console.print_json(json.dumps(detected, ensure_ascii=False))
         return
 
-    is_hw = detected.get("source") == "hardware_exif"
-    status_color = "green" if is_hw else ("yellow" if detected.get("detected") else "red")
+    is_claimed = detected.get("claimed_by_metadata", False)
+    is_hw = detected.get("source") == "hardware_exif" and not is_claimed
+    is_detected = detected.get("detected", False)
+
+    if is_claimed:
+        status_color = "yellow"
+        dominant = getattr(report.verdict, "dominant_method", "non-photographic image")
+        status_label = f"Claimed by Metadata (Contradicted by {dominant})"
+    elif is_hw:
+        status_color = "green"
+        status_label = "Detected via Hardware EXIF"
+    elif is_detected:
+        status_color = "cyan"
+        status_label = "Inferred from Optical Forensics"
+    else:
+        status_color = "red"
+        status_label = "No Physical Camera (Non-Photographic Image)"
 
     console.print(Panel(
         f"[bold {status_color}]Camera Profile: {detected.get('display_name', 'Unknown')}[/bold {status_color}]\n"
-        f"• Status: {'Detected via Hardware EXIF' if is_hw else ('Inferred from Optical Forensics' if detected.get('detected') else 'No Camera Detected')}\n"
+        f"• Status: {status_label}\n"
         f"• Confidence: {detected.get('confidence', 'none').upper()}\n"
         f"• Device Type: {detected.get('device_type_label', 'Unknown')}\n"
         f"• Sensor Format: {detected.get('sensor_format_label', 'Unknown')}"
@@ -613,6 +625,10 @@ def camera(
         title=f"📷 Camera Identification — {image.name}",
         expand=False,
     ))
+
+    if not is_detected and not is_claimed:
+        console.print(f"[dim]{detected.get('summary', 'No physical camera detected.')}[/dim]\n")
+        return
 
     table = Table(title="Shooting Parameters & Optical Diagnostics", show_header=True, header_style="bold magenta")
     table.add_column("Property", style="cyan")

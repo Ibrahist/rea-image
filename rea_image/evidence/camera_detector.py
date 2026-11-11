@@ -555,8 +555,13 @@ class CameraDetector:
                 "aperture": None,
                 "shutter_speed": None,
                 "iso": None,
+                "flash_fired": None,
+                "exposure_program": None,
+                "metering_mode": None,
+                "software_firmware": None,
+                "datetime_original": None,
                 "computational_traces": [],
-                "summary": "No physical camera detected (non-photographic image)",
+                "summary": "No physical camera (non-photographic image)",
             }
 
         # Analyze aspect ratio
@@ -660,9 +665,9 @@ class CameraDetector:
         img: Optional[Image.Image] = None,
         path: Optional[Path] = None,
         is_photograph: bool = True,
+        dominant_method: str = "real photograph",
     ) -> Dict[str, Any]:
         """Execute end-to-end camera detection: hardware EXIF first, then optical forensics."""
-        # 1. Attempt hardware EXIF extraction
         hw_cam = self.extract_hardware_exif(img=img, path=path)
         if hw_cam is not None:
             # Augment with optical craft signatures
@@ -673,14 +678,38 @@ class CameraDetector:
                 "vignette_falloff": optical_craft.get("vignette_falloff"),
                 "chromatic_aberration": optical_craft.get("chromatic_aberration"),
             }
+            if not is_photograph:
+                cam_name = f"{hw_cam.get('make', '')} {hw_cam.get('model', '')}".strip() or "Camera"
+                hw_cam["claimed_by_metadata"] = True
+                hw_cam["confidence"] = "low"
+                hw_cam["source"] = "claimed_by_metadata"
+                hw_cam["display_name"] = f"{cam_name} (claimed by metadata)"
+                hw_cam["summary"] = f"{cam_name} (claimed by metadata, contradicted by {dominant_method})"
             return hw_cam
 
-        # 2. Infer from optical forensics
+        # If no hardware EXIF and non-photographic, return non-photo camera profile
+        if not is_photograph:
+            non_photo = self.infer_from_optics(
+                arr=arr,
+                aspect_ratio=aspect_ratio,
+                optical_craft=optical_craft,
+                is_photograph=False,
+            )
+            non_photo["optical_signatures"] = {
+                "depth_of_field": optical_craft.get("depth_of_field"),
+                "estimated_aperture": optical_craft.get("estimated_aperture"),
+                "estimated_focal_length": optical_craft.get("estimated_focal_length"),
+                "vignette_falloff": optical_craft.get("vignette_falloff"),
+                "chromatic_aberration": optical_craft.get("chromatic_aberration"),
+            }
+            return non_photo
+
+        # 2. Infer from optical forensics (is_photograph is True)
         inferred = self.infer_from_optics(
             arr=arr,
             aspect_ratio=aspect_ratio,
             optical_craft=optical_craft,
-            is_photograph=is_photograph,
+            is_photograph=True,
         )
         inferred["optical_signatures"] = {
             "depth_of_field": optical_craft.get("depth_of_field"),
