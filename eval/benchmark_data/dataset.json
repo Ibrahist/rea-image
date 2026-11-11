@@ -12,7 +12,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "ai_tuning_comp",
@@ -27,7 +28,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "graphic_tuning_orig",
@@ -42,7 +44,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "graphic_heldout_ss",
@@ -57,7 +60,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "photo_heldout_orig",
@@ -72,7 +76,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "photo_heldout_comp",
@@ -87,7 +92,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "photo_heldout_ss",
@@ -102,7 +108,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "ai_heldout_ss",
@@ -117,7 +124,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "ai_heldout_orig",
@@ -132,7 +140,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "photo_heldout_orig2",
@@ -147,7 +156,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": "ambiguous"
   },
   {
     "id": "graphic_heldout_orig",
@@ -162,7 +172,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "graphic_heldout_comp",
@@ -177,7 +188,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "ai_heldout_comp",
@@ -192,7 +204,8 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
   },
   {
     "id": "graphic_heldout_ss2",
@@ -207,6 +220,39 @@
         "area_pct": 100.0,
         "bbox": null
       }
-    ]
+    ],
+    "expected_camera_class": null
+  },
+  {
+    "id": "photo_stripped_phone",
+    "image_path": "eval/benchmark_data/images/photo_stripped_phone.png",
+    "split": "held_out",
+    "condition": "original",
+    "expected_dominant_method": "real photograph",
+    "expected_regions": [
+      {
+        "id": "r0",
+        "expected_method": "real photograph",
+        "area_pct": 100.0,
+        "bbox": null
+      }
+    ],
+    "expected_camera_class": "smartphone"
+  },
+  {
+    "id": "photo_stripped_dslr",
+    "image_path": "eval/benchmark_data/images/photo_stripped_dslr.png",
+    "split": "held_out",
+    "condition": "original",
+    "expected_dominant_method": "real photograph",
+    "expected_regions": [
+      {
+        "id": "r0",
+        "expected_method": "real photograph",
+        "area_pct": 100.0,
+        "bbox": null
+      }
+    ],
+    "expected_camera_class": "dedicated_camera"
   }
 ]

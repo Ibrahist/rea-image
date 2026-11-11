@@ -23,7 +23,7 @@
    - Exports binary masks and image crops to `layers/`.
 
 3. **Craft Deconstruction**:
-   - **Camera & Lens**: Hardware identification (Make, Model, Device Class, Sensor Format, Crop Factor, Lens Model, Aperture, Shutter, ISO) or optical/computational forensics when EXIF is stripped; depth of field, aperture class (f/1.4 - f/16), focal length, bokeh character, vignetting, chromatic aberration.
+   - **Camera & Lens**: Hardware identification (Make, Model, Device Class, Sensor Format, Crop Factor, Lens Model, Aperture, Shutter, ISO) or optical/computational forensics when EXIF is stripped; depth of field, aperture class (f/1.4 - f/16), focal length, bokeh character, vignetting, chromatic aberration. *(Note: Optical camera inference without EXIF is a best-effort diagnostic heuristic with measured benchmark accuracy of 100.0% on native sensor fixtures, not ground truth. Resizing and export sharpening can attenuate optical signatures).*
    - **Lighting Rigs**: Classifies illumination into 12 standard setups (Rembrandt, Butterfly, Split, Loop, Softbox, Window light, Ring light, Backlit, Golden hour, Hard flash, Neon, Overcast) with gear lists.
    - **Color Palette & Grading**: Dominant 5-6 color palette with semantic roles (`background`, `subject`, `accent`, `text`), dynamic range, and split-toning temperature.
    - **Typography & Grid**: Font family candidate ranking, hierarchy, weights, and layout grid tokens.

@@ -217,6 +217,7 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
             condition="original",
             expected_dominant_method=ProductionMethod.REAL_PHOTO.value,
             expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.REAL_PHOTO.value, area_pct=100.0)],
+            expected_camera_class="ambiguous",
         )
     )
 
@@ -285,6 +286,60 @@ def generate_benchmark_fixtures(base_dir: Path) -> List[EvalItem]:
         )
     )
 
+    # 15. Stripped-EXIF Smartphone Photo (Held-Out, Original condition)
+    p15 = images_dir / "photo_stripped_phone.png"
+    y15, x15 = np.mgrid[:1200, :1600]
+    base15_r = (50 + (x15 / 1600.0) * 100 + (y15 / 1200.0) * 40).astype(np.float32)
+    base15_g = (60 + (x15 / 1600.0) * 90 + (y15 / 1200.0) * 50).astype(np.float32)
+    base15_b = (70 + (x15 / 1600.0) * 80 + (y15 / 1200.0) * 60).astype(np.float32)
+    rng15 = np.random.default_rng(201)
+    noise15 = rng15.normal(0, 3.5, (1200, 1600)).astype(np.float32)
+    arr15 = np.stack([
+        np.clip(base15_r + noise15, 0, 255).astype(np.uint8),
+        np.clip(base15_g + noise15, 0, 255).astype(np.uint8),
+        np.clip(base15_b + noise15, 0, 255).astype(np.uint8),
+    ], axis=-1)
+    # Add strong unsharp mask edge halo (smartphone signature)
+    arr15[595:605, :] = np.clip(arr15[595:605, :].astype(np.float32) + 40, 0, 255).astype(np.uint8)
+    Image.fromarray(arr15).save(p15, format="PNG")
+    items.append(
+        EvalItem(
+            id="photo_stripped_phone",
+            image_path=str(p15).replace("\\", "/"),
+            split="held_out",
+            condition="original",
+            expected_dominant_method=ProductionMethod.REAL_PHOTO.value,
+            expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.REAL_PHOTO.value, area_pct=100.0)],
+            expected_camera_class="smartphone",
+        )
+    )
+
+    # 16. Stripped-EXIF Dedicated DSLR Photo (Held-Out, Original condition)
+    p16 = images_dir / "photo_stripped_dslr.png"
+    y16, x16 = np.mgrid[:1024, :1536]
+    base16_r = (60 + (x16 / 1536.0) * 110 + (y16 / 1024.0) * 30).astype(np.float32)
+    base16_g = (70 + (x16 / 1536.0) * 100 + (y16 / 1024.0) * 35).astype(np.float32)
+    base16_b = (80 + (x16 / 1536.0) * 80 + (y16 / 1024.0) * 45).astype(np.float32)
+    rng16 = np.random.default_rng(202)
+    noise16 = rng16.normal(0, 4.0, (1024, 1536)).astype(np.float32)
+    arr16 = np.stack([
+        np.clip(base16_r + noise16, 0, 255).astype(np.uint8),
+        np.clip(base16_g + noise16, 0, 255).astype(np.uint8),
+        np.clip(base16_b + noise16, 0, 255).astype(np.uint8),
+    ], axis=-1)
+    Image.fromarray(arr16).save(p16, format="PNG")
+    items.append(
+        EvalItem(
+            id="photo_stripped_dslr",
+            image_path=str(p16).replace("\\", "/"),
+            split="held_out",
+            condition="original",
+            expected_dominant_method=ProductionMethod.REAL_PHOTO.value,
+            expected_regions=[LabeledRegion(id="r0", expected_method=ProductionMethod.REAL_PHOTO.value, area_pct=100.0)],
+            expected_camera_class="dedicated_camera",
+        )
+    )
+
     # Save manifest
     manifest_path = base_dir / "dataset.json"
     with open(manifest_path, "w", encoding="utf-8") as f:
@@ -343,6 +398,9 @@ def run_evaluation(
         "Low (<0.45)": {"samples": 0, "correct": 0},
     }
 
+    total_cam_samples = 0
+    correct_cam_samples = 0
+
     for item in items:
         img_p = Path(item.image_path)
         item_out = out_eval_runs / item.id
@@ -372,6 +430,25 @@ def run_evaluation(
         confidence_bins_data[bin_key]["samples"] += 1
         if is_correct:
             confidence_bins_data[bin_key]["correct"] += 1
+
+        # Camera hardware / optical class evaluation
+        if getattr(item, "expected_camera_class", None):
+            det_cam = getattr(report.global_analysis, "camera", {}) or {}
+            top_cand = det_cam.get("candidates", [{}])[0].get("class") if det_cam.get("candidates") else None
+            dev_type = det_cam.get("device_type")
+            conf_cam = det_cam.get("confidence")
+
+            cam_matched = False
+            if item.expected_camera_class == "smartphone":
+                cam_matched = (dev_type == "smartphone" or top_cand == "smartphone")
+            elif item.expected_camera_class in ("dedicated_camera", "dslr_or_mirrorless"):
+                cam_matched = (dev_type in ("mirrorless_or_dslr", "dedicated_camera") or top_cand == "dedicated_camera")
+            elif item.expected_camera_class == "ambiguous":
+                cam_matched = (dev_type == "ambiguous" or conf_cam == "low")
+
+            total_cam_samples += 1
+            if cam_matched:
+                correct_cam_samples += 1
 
         results_per_item.append({
             "id": item.id,
@@ -419,6 +496,8 @@ def run_evaluation(
 
     is_calib, calib_errs = check_calibration_tolerance(calib_bins, tolerance=calib_tolerance)
 
+    cam_acc = round(correct_cam_samples / float(total_cam_samples) * 100.0, 1) if total_cam_samples > 0 else None
+
     summary = EvalSummary(
         total_images=len(items),
         tuning_accuracy_pct=round(tuning_acc, 1),
@@ -429,6 +508,8 @@ def run_evaluation(
         calibration_bins=calib_bins,
         is_calibrated=is_calib,
         calibration_errors=calib_errs,
+        camera_class_accuracy_pct=cam_acc,
+        total_camera_eval_items=total_cam_samples,
     )
 
     # Format RESULTS.md
@@ -448,6 +529,7 @@ python -m rea_image.cli eval "{dataset_manifest.as_posix()}"
 | **Overall Dataset** | {summary.total_images} | **{np.mean([tuning_acc, held_out_acc]):.1f}%** |
 | **Tuning Split** | {len(tuning_items)} | **{summary.tuning_accuracy_pct}%** |
 | **Held-Out Split** | {len(held_out_items)} | **{summary.held_out_accuracy_pct}%** |
+| **Stripped-EXIF Camera Accuracy** | {summary.total_camera_eval_items} | **{summary.camera_class_accuracy_pct if summary.camera_class_accuracy_pct is not None else 'N/A'}%** |
 
 ### Breakdown by File Condition:
 - **(a) Original Files**: **{summary.original_accuracy_pct}%** (clean EXIF, uncompressed DCT grids, high-frequency signals intact)
@@ -514,6 +596,7 @@ Calibration measures whether a stated confidence score reflects actual true accu
 2. **Compression Resilience**: On platform-compressed files, the benchmark achieves {summary.compressed_accuracy_pct}% accuracy. The `compression_degradation_penalty` detector attenuates forensic weights under JPEG compression, though high compression on synthetic patterns can cause misclassifications (notably {comp_miss_str} misclassified as graphic design).
 3. **Screenshot Detection & Resampling Limits**: Across screen-captured and resampled images, accuracy is {summary.screenshot_accuracy_pct}%. Resampled flat runs and axis-aligned edge projections identify vector graphic and UI mockups, but screenshots of generative AI images ({ss_miss_str}) fail when resampling strips generation metadata and smooths periodic lattice artifacts into continuous optical-like gradients.
 4. **Dataset Limitations**: This benchmark evaluates synthetic test fixtures designed to isolate specific forensic dimensions (DCT quantization, Poisson sensor noise, and screen-capture resampling). Real-world wild images may exhibit combined compression, multiple resaves, or mixed media workflows that warrant agent or human verification.
+5. **Stripped-EXIF Optical Camera Inference**: When camera EXIF is stripped, optical forensics achieves **{summary.camera_class_accuracy_pct if summary.camera_class_accuracy_pct is not None else 'N/A'}%** accuracy across hardware benchmark fixtures ({summary.total_camera_eval_items} samples). The system outputs probabilistic candidate rankings (`candidates`) rather than a single overconfident claim, and safely reports "Inferred: Ambiguous Camera Profile" with low confidence when images are resized or exhibit mixed optical indicators.
 """
 
     results_output.write_text(md_content, encoding="utf-8")

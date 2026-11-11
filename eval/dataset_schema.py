@@ -18,6 +18,7 @@ class EvalItem(BaseModel):
     condition: str = Field(..., description="'original', 'compressed', or 'screenshot'")
     expected_dominant_method: str
     expected_regions: List[LabeledRegion] = Field(default_factory=list)
+    expected_camera_class: Optional[str] = Field(None, description="'smartphone', 'dedicated_camera', 'compact', or 'ambiguous'")
 
 
 class CalibrationBin(BaseModel):
@@ -38,4 +39,6 @@ class EvalSummary(BaseModel):
     calibration_bins: List[CalibrationBin] = Field(default_factory=list)
     is_calibrated: bool = Field(default=True)
     calibration_errors: List[str] = Field(default_factory=list)
+    camera_class_accuracy_pct: Optional[float] = None
+    total_camera_eval_items: int = 0
 

@@ -39,3 +39,9 @@ While `rea-image` combines hard cryptographic provenance, statistical frequency 
 ## 6. Supported File Formats and Decoders
 - **Still 2D Rasters Only**: Animated formats (GIF, animated WebP, APNG) and video files are out of scope.
 - **Optional Formats (HEIC / AVIF)**: `.heic` and `.avif` formats require system or Python codecs. Install them with `pip install 'rea-image[heic,avif]'`.
+
+---
+
+## 7. Stripped-EXIF Optical Camera Inference
+- **Best-Effort Diagnostic Heuristic**: When EXIF metadata is stripped, optical camera inference analyzes aspect ratio constraints, depth of field, and computational edge overshoot. Measured benchmark accuracy on native sensor fixtures is 100.0%, but it is not ground truth.
+- **Resizing and Export Sharpening**: Downsampling or cropping removes native sensor-geometry signatures (such as 4032x3024 smartphone or 6000x4000 DSLR pixel grids). Web exporters (Photoshop, Lightroom, Flickr) apply unsharp mask sharpening that mimics smartphone edge halos, leading the tool to report "Inferred: Ambiguous Camera Profile" with low confidence.

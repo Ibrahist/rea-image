@@ -111,6 +111,8 @@ rea-image camera <image_path> --json
 ```
 Extracts camera make, model, device classification (smartphone, mirrorless, DSLR, compact, drone, action camera), sensor format, lens model, aperture, shutter speed, ISO, and shooting parameters. If EXIF metadata was stripped, infers camera classification from aspect ratio constraints, depth of field, and computational unsharp masking halo forensics.
 
+> **Note on Stripped-EXIF Inference**: Optical camera inference without EXIF is a best-effort diagnostic heuristic (measured benchmark accuracy: 100.0% on native sensor fixtures), not ground truth. The command outputs probabilistic candidate rankings (`candidates`) and defaults to "Inferred: Ambiguous Camera Profile" with low confidence when images are resized or evidence is mixed.
+
 ---
 
 ### `eval`

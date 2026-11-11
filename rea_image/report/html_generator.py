@@ -317,6 +317,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           ({{ report.global_analysis.camera.device_type_label }} • {{ report.global_analysis.camera.sensor_format_label }})
         </span>
       </p>
+      {% if report.global_analysis.camera.candidates %}
+      <div style="margin-bottom: 14px; display: flex; gap: 8px; flex-wrap: wrap;">
+        {% for cand in report.global_analysis.camera.candidates %}
+        <span class="badge" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border);">
+          {{ cand.label }}: {{ (cand.probability * 100) | round | int }}%
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
       <div class="grid-2" style="margin-bottom: 0;">
         <ul style="list-style: none; font-size: 0.9rem; color: var(--text-muted); line-height: 1.8;">
           {% if report.global_analysis.camera.lens %}

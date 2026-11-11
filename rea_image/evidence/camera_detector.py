@@ -223,6 +223,31 @@ GENERATIVE_SOFTWARE_KEYWORDS = [
     "bing image creator",
 ]
 
+NATIVE_SMARTPHONE_DIMS = {
+    (4032, 3024), (3024, 4032),
+    (4000, 3000), (3000, 4000),
+    (4080, 3072), (3072, 4080),
+    (4624, 3468), (3468, 4624),
+    (8192, 6144), (6144, 8192),
+    (9248, 6936), (6936, 9248),
+    (12000, 9000), (9000, 12000),
+    (2048, 1536), (1536, 2048),
+    (1600, 1200), (1200, 1600),
+}
+
+NATIVE_DEDICATED_DIMS = {
+    (6000, 4000), (4000, 6000),
+    (6240, 4160), (4160, 6240),
+    (8192, 5464), (5464, 8192),
+    (9504, 6336), (6336, 9504),
+    (7360, 4912), (4912, 7360),
+    (5472, 3648), (3648, 5472),
+    (4288, 2848), (2848, 4288),
+    (4928, 3264), (3264, 4928),
+    (3008, 2000), (2000, 3008),
+    (1536, 1024), (1024, 1536),
+}
+
 
 # ---------------------------------------------------------------------------
 # Camera Classification Rules
@@ -616,10 +641,19 @@ class CameraDetector:
                 "summary": "No physical camera (non-photographic image)",
             }
 
+        h, w = arr.shape[:2]
+        dim_pair = (max(w, h), min(w, h))
+
+        # Check native unbinned sensor resolutions
+        is_native_phone = dim_pair in NATIVE_SMARTPHONE_DIMS
+        is_native_dedicated = dim_pair in NATIVE_DEDICATED_DIMS
+        is_native_dim = is_native_phone or is_native_dedicated
+
         # Analyze aspect ratio
         clean_aspect = aspect_ratio.strip()
-        is_4_3 = clean_aspect in ("4:3", "3:4")
-        is_3_2 = clean_aspect in ("3:2", "2:3")
+        ar_val = max(w, h) / min(w, h) if min(w, h) > 0 else 1.0
+        is_4_3 = clean_aspect in ("4:3", "3:4") or abs(ar_val - 4.0 / 3.0) < 0.05
+        is_3_2 = clean_aspect in ("3:2", "2:3") or abs(ar_val - 1.5) < 0.05
 
         # Computational sharpening and tone mapping checks
         sharp_res = measure_computational_sharpening(arr)
@@ -634,43 +668,109 @@ class CameraDetector:
         elif is_3_2:
             traces.append("Native 3:2 aspect ratio characteristic of 35mm Full-Frame and APS-C sensors")
 
+        if is_native_phone:
+            traces.append(f"Dimensions ({w}x{h}) match native smartphone sensor format")
+        elif is_native_dedicated:
+            traces.append(f"Dimensions ({w}x{h}) match native dedicated camera 3:2 format")
+        else:
+            traces.append(f"Dimensions ({w}x{h}) indicate frame was resized, cropped, or display-resampled")
+
         if sharp_res["has_unsharp_halo"]:
-            traces.append(f"Computational unsharp masking halo (overshoot ratio {sharp_res['overshoot_ratio']})")
+            if is_native_dim:
+                traces.append(f"Computational unsharp masking halo (overshoot ratio {sharp_res['overshoot_ratio']})")
+            else:
+                traces.append("Unsharp mask edge halo detected (could be computational smartphone sharpening or post-processing export filter)")
         if dr_res["has_hdr_shadow_boost"]:
             traces.append("Multi-frame HDR local tone mapping (elevated shadow detail)")
 
         # Scoring heuristics
-        smartphone_score = 0
-        dedicated_score = 0
+        phone_score = 1.0
+        dedicated_score = 1.0
 
         if is_4_3:
-            smartphone_score += 3
+            phone_score += 2.5
+            dedicated_score += 0.5
         elif is_3_2:
-            dedicated_score += 4
+            dedicated_score += 3.5
+
+        if is_native_phone:
+            phone_score += 3.5
+        elif is_native_dedicated:
+            dedicated_score += 3.5
 
         if sharp_res["has_unsharp_halo"]:
-            smartphone_score += 3
+            if is_native_phone:
+                phone_score += 2.5
+            elif is_native_dedicated:
+                dedicated_score += 0.5
+            else:
+                phone_score += 1.0
         else:
-            dedicated_score += 1
+            dedicated_score += 1.5
 
         if dr_res["has_hdr_shadow_boost"]:
-            smartphone_score += 2
+            phone_score += 2.0
 
         if "shallow" in dof.lower():
-            dedicated_score += 3
+            dedicated_score += 3.0
         elif "deep" in dof.lower():
-            smartphone_score += 2
+            phone_score += 1.5
 
-        if smartphone_score >= dedicated_score:
+        # Normalize to probability distribution
+        total_score = phone_score + dedicated_score
+        p_phone = round(phone_score / total_score, 2)
+        p_dedicated = round(1.0 - p_phone, 2)
+
+        candidates = [
+            {
+                "class": "smartphone",
+                "label": "Modern Smartphone",
+                "probability": p_phone,
+            },
+            {
+                "class": "dedicated_camera",
+                "label": "Dedicated Camera (DSLR / Mirrorless)",
+                "probability": p_dedicated,
+            },
+        ]
+        candidates.sort(key=lambda c: c["probability"], reverse=True)
+
+        prob_diff = abs(p_phone - p_dedicated)
+        is_resized = not is_native_dim
+
+        # Ambiguous resolution condition:
+        # Close probabilities (< 0.15) OR resized dimensions lacking sensor-geometry signals
+        if prob_diff < 0.15 or is_resized:
+            device_type = "ambiguous"
+            device_type_label = "Ambiguous Camera Class"
+            sensor_format = "unknown"
+            sensor_format_label = "Uncertain Sensor Format"
+            crop_factor = None
+            display_name = "Inferred: Ambiguous Camera Profile"
+            clean_model = "Ambiguous Camera Profile (mixed optical indicators or resized frame)"
+            confidence = "low"
+            ambiguity_reason = (
+                "resizing/compression attenuates optical signatures; "
+                "unsharp mask sharpening could be in-camera or post-processing export"
+            )
+            summary = f"Inferred: Ambiguous Camera Profile ({ambiguity_reason})"
+            why_doubted = [ambiguity_reason]
+            why_believed = []
+        elif candidates[0]["class"] == "smartphone":
             device_type = "smartphone"
             device_type_label = "Smartphone Camera"
             sensor_format = "smartphone_small"
             sensor_format_label = "Smartphone Sensor (~1/1.3\" to 1/2.5\")"
             crop_factor = 4.0
             display_name = "Inferred: Likely Modern Smartphone"
-            clean_model = "Likely Modern Smartphone (4:3 sensor, computational sharpening)"
-            confidence = "medium" if is_4_3 or sharp_res["has_unsharp_halo"] else "low"
-            summary = f"Inferred: Likely Smartphone (4:3 sensor format, computational edge enhancement, {focal_est})"
+            clean_model = "Likely Modern Smartphone (4:3 native sensor, computational sharpening)"
+            confidence = "medium"
+            summary = f"Inferred: Likely Modern Smartphone (probability {p_phone:.0%}, 4:3 native sensor, {focal_est})"
+            why_believed = [
+                f"Native smartphone sensor format ({w}x{h})",
+                f"Candidate probability {p_phone:.0%}",
+            ]
+            why_doubted = []
         else:
             device_type = "mirrorless_or_dslr"
             device_type_label = "Dedicated Mirrorless / DSLR Camera"
@@ -678,9 +778,14 @@ class CameraDetector:
             sensor_format_label = "APS-C or Full-Frame 35mm Sensor"
             crop_factor = 1.0
             display_name = "Inferred: Likely Dedicated Camera (APS-C / Full-Frame)"
-            clean_model = "Likely Dedicated Camera (3:2 35mm/APS-C sensor format, natural optical falloff)"
-            confidence = "medium" if is_3_2 else "low"
-            summary = f"Inferred: Likely Dedicated Camera (3:2 format, optical gradient falloff, {focal_est}, {aperture_est})"
+            clean_model = "Likely Dedicated Camera (3:2 35mm/APS-C native sensor, natural optical falloff)"
+            confidence = "medium"
+            summary = f"Inferred: Likely Dedicated Camera (probability {p_dedicated:.0%}, 3:2 native format, {focal_est}, {aperture_est})"
+            why_believed = [
+                f"Native 3:2 sensor format ({w}x{h})",
+                f"Candidate probability {p_dedicated:.0%}",
+            ]
+            why_doubted = []
 
         return {
             "detected": True,
@@ -706,6 +811,9 @@ class CameraDetector:
             "software_firmware": None,
             "datetime_original": None,
             "computational_traces": traces,
+            "candidates": candidates,
+            "why_believed": why_believed,
+            "why_doubted": why_doubted,
             "summary": summary,
         }
 

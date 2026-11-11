@@ -618,13 +618,19 @@ def camera(
         status_color = "red"
         status_label = "No Physical Camera (Non-Photographic Image)"
 
+    cand_line = ""
+    if detected.get("candidates"):
+        items_str = ", ".join(f"{c.get('label', c.get('class'))} ({c.get('probability', 0):.0%})" for c in detected["candidates"])
+        cand_line = f"\n• Candidates: {items_str}"
+
     console.print(Panel(
         f"[bold {status_color}]Camera Profile: {detected.get('display_name', 'Unknown')}[/bold {status_color}]\n"
         f"• Status: {status_label}\n"
         f"• Confidence: {detected.get('confidence', 'none').upper()}\n"
         f"• Device Type: {detected.get('device_type_label', 'Unknown')}\n"
         f"• Sensor Format: {detected.get('sensor_format_label', 'Unknown')}"
-        + (f" (Crop: {detected.get('sensor_crop_factor')}x)" if detected.get("sensor_crop_factor") else ""),
+        + (f" (Crop: {detected.get('sensor_crop_factor')}x)" if detected.get("sensor_crop_factor") else "")
+        + cand_line,
         title=f"📷 Camera Identification — {image.name}",
         expand=False,
     ))
@@ -709,6 +715,8 @@ def eval_dataset(
     console.print(f"  • Original Files Accuracy: [green]{summary.original_accuracy_pct}%[/green]")
     console.print(f"  • Platform-Compressed Accuracy: [green]{summary.compressed_accuracy_pct}%[/green]")
     console.print(f"  • Screenshot Accuracy: [green]{summary.screenshot_accuracy_pct}%[/green]")
+    if summary.camera_class_accuracy_pct is not None:
+        console.print(f"  • Stripped-EXIF Camera Class Accuracy: [green]{summary.camera_class_accuracy_pct}%[/green] ({summary.total_camera_eval_items} samples)")
     console.print(f"\nDetailed report written to [bold]{results_path}[/bold]")
 
     if not summary.is_calibrated:

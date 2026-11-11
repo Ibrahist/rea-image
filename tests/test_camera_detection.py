@@ -279,8 +279,8 @@ def test_inferred_optical_camera_detection():
     """Test camera type inference when EXIF is stripped."""
     detector = CameraDetector()
 
-    # Case 1: 4:3 aspect ratio with deep DoF
-    arr_4_3 = np.zeros((300, 400, 3), dtype=np.uint8)
+    # Case 1: Native 4:3 aspect ratio with deep DoF
+    arr_4_3 = np.zeros((1200, 1600, 3), dtype=np.uint8)
     arr_4_3[:, :] = [120, 150, 180]
     optical_craft_4_3 = {
         "depth_of_field": "deep depth of field (all elements sharp)",
@@ -292,9 +292,11 @@ def test_inferred_optical_camera_detection():
     assert res_phone["source"] == "optical_forensics"
     assert res_phone["device_type"] == "smartphone"
     assert res_phone["sensor_format"] == "smartphone_small"
+    assert res_phone["candidates"][0]["class"] == "smartphone"
+    assert res_phone["candidates"][0]["probability"] > 0.5
 
-    # Case 2: 3:2 aspect ratio with shallow DoF
-    arr_3_2 = np.zeros((200, 300, 3), dtype=np.uint8)
+    # Case 2: Native 3:2 aspect ratio with shallow DoF
+    arr_3_2 = np.zeros((1024, 1536, 3), dtype=np.uint8)
     arr_3_2[:, :] = [100, 120, 140]
     optical_craft_3_2 = {
         "depth_of_field": "shallow depth of field (cinematic separation)",
@@ -305,8 +307,17 @@ def test_inferred_optical_camera_detection():
     assert res_dslr["detected"] is True
     assert res_dslr["device_type"] == "mirrorless_or_dslr"
     assert res_dslr["sensor_format"] == "aps_c_or_full_frame"
+    assert res_dslr["candidates"][0]["class"] == "dedicated_camera"
+    assert res_dslr["candidates"][0]["probability"] > 0.5
 
-    # Case 3: Non-photographic image
+    # Case 3: Resized non-native dimensions -> Ambiguous camera profile
+    arr_resized = np.zeros((300, 400, 3), dtype=np.uint8)
+    res_ambiguous = detector.infer_from_optics(arr_resized, aspect_ratio="4:3", optical_craft=optical_craft_4_3, is_photograph=True)
+    assert res_ambiguous["display_name"] == "Inferred: Ambiguous Camera Profile"
+    assert res_ambiguous["confidence"] == "low"
+    assert len(res_ambiguous["candidates"]) == 2
+
+    # Case 4: Non-photographic image
     res_non_photo = detector.infer_from_optics(arr_3_2, aspect_ratio="3:2", optical_craft=optical_craft_3_2, is_photograph=False)
     assert res_non_photo["detected"] is False
     assert res_non_photo["source"] == "none"
