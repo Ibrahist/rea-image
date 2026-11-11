@@ -7,6 +7,11 @@
   <meta name="description" content="Open-source tool and AI agent skill to reverse-engineer any still image: deconstruct how it was made, present measurable evidence, and produce actionable recreation blueprints.">
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
   
+  <!-- Bricolage Grotesque Variable Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
   <style>
     :root {
       --bg: #09090b;
@@ -28,7 +33,7 @@
       --green: #22c55e;
       --green-glow: rgba(34, 197, 94, 0.12);
       --blue: #38bdf8;
-      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', system-ui, sans-serif;
+      --font-sans: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, ui-monospace, monospace;
     }
 
@@ -38,10 +43,12 @@
       background-color: var(--bg);
       color-scheme: dark;
     }
+    body, button, input, select, textarea {
+      font-family: var(--font-sans);
+    }
     body {
       background-color: var(--bg);
       color: var(--text);
-      font-family: var(--font-sans);
       line-height: 1.6;
       overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
@@ -1916,7 +1923,7 @@ settings:
   flex-direction: column;
   gap: 16px;
   color: #f4f4f5;
-  font-family: system-ui, sans-serif;
+  font-family: 'Bricolage Grotesque', sans-serif;
 ">
   <div style="font-size: 20px; font-weight: 700; color: #f97316;">Monthly Revenue</div>
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
@@ -1935,7 +1942,7 @@ settings:
           <path d="M0 150 Q100 80 200 150 T400 150 L400 300 L0 300 Z" fill="#ea580c"/>
           <circle cx="280" cy="80" r="40" fill="#fb923c"/>
           <rect x="40" y="40" width="140" height="24" fill="#27272a"/>
-          <text x="50" y="58" fill="#ffffff" font-size="14" font-weight="bold" font-family="sans-serif">DESIGN SUMMIT</text>
+          <text x="50" y="58" fill="#ffffff" font-size="14" font-weight="bold" font-family="'Bricolage Grotesque', sans-serif">DESIGN SUMMIT</text>
         `,
         tag0: "region_0 (dark background)",
         tag1: "region_1 (curved vector wave)",
@@ -1966,7 +1973,7 @@ settings:
   
   <!-- Typography Badge -->
   <rect x="80" y="80" width="280" height="48" rx="4" fill="#27272A"/>
-  <text x="100" y="112" font-family="'Inter', sans-serif" font-weight="700" font-size="28" fill="#FFFFFF">DESIGN SUMMIT</text>
+  <text x="100" y="112" font-family="'Bricolage Grotesque', sans-serif" font-weight="700" font-size="28" fill="#FFFFFF">DESIGN SUMMIT</text>
 </svg>`
       }
     };
