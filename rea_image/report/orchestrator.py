@@ -81,8 +81,12 @@ def compute_detectors_fingerprint(detectors: list) -> str:
 
 def compute_craft_fingerprint() -> str:
     """Compute SHA-256 fingerprint from craft-analysis classes, functions, and source files."""
+    from rea_image.evidence.camera_detector import classify_camera_device
+
     craft_targets = [
         CameraCraftEstimator,
+        CameraDetector,
+        classify_camera_device,
         LightingClassifier,
         extract_dominant_palette,
         analyze_color_grade,
@@ -95,6 +99,21 @@ def compute_craft_fingerprint() -> str:
             parts.append(inspect.getsource(target))
         except Exception:
             pass
+        if inspect.isclass(target):
+            for attr in ("detect", "infer_from_optics", "extract_hardware_exif", "estimate", "classify"):
+                meth = getattr(target, attr, None)
+                if meth and callable(meth):
+                    try:
+                        parts.append(inspect.getsource(meth))
+                    except Exception:
+                        pass
+                    try:
+                        code = getattr(meth, "__code__", None)
+                        if code:
+                            parts.append(str(code.co_code))
+                            parts.append(str(code.co_consts))
+                    except Exception:
+                        pass
         try:
             file_path = inspect.getsourcefile(target)
             if file_path and os.path.exists(file_path):
@@ -102,6 +121,16 @@ def compute_craft_fingerprint() -> str:
                     parts.append(hashlib.sha256(f.read()).hexdigest())
         except Exception:
             pass
+
+    # Include raw content hash of cameras.yaml catalog
+    try:
+        yaml_path = Path(__file__).parent.parent / "capabilities" / "cameras.yaml"
+        if yaml_path.exists():
+            with open(yaml_path, "rb") as f:
+                parts.append(hashlib.sha256(f.read()).hexdigest())
+    except Exception:
+        pass
+
     return hashlib.sha256("".join(parts).encode("utf-8")).hexdigest()[:16]
 
 

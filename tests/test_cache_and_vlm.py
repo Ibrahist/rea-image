@@ -167,3 +167,49 @@ def test_cache_detector_modification_invalidation(tmp_path: Path, monkeypatch):
     assert "custom_monkeypatched_signal" in names2
 
 
+def test_cache_camera_detector_modification_invalidation(tmp_path: Path, monkeypatch):
+    """Verify that monkeypatching CameraDetector.detect invalidates craft cache without version bump."""
+    from rea_image.report.orchestrator import run_analysis_pipeline
+    from rea_image.evidence.camera_detector import CameraDetector
+
+    img_path = tmp_path / "camera_cache_sample.png"
+    img = Image.new("RGB", (100, 100), color=(140, 120, 100))
+    img.save(img_path)
+
+    # 1. Run pipeline first time with default camera detector
+    rep1 = run_analysis_pipeline(img_path, out_dir=tmp_path / "cam_run1")
+    assert rep1 is not None
+    orig_cam = rep1.global_analysis.camera.get("display_name")
+    assert orig_cam != "Monkeypatched Custom Camera X99"
+
+    # 2. Monkeypatch CameraDetector.detect to output a modified camera profile
+    def custom_detect(self, arr, aspect_ratio, optical_craft, img=None, path=None, is_photograph=True, dominant_method="real photograph", redact_metadata=False):
+        return {
+            "detected": True,
+            "source": "optical_forensics",
+            "confidence": "high",
+            "display_name": "Monkeypatched Custom Camera X99",
+            "make": "MonkeypatchMaker",
+            "model": "Camera X99",
+            "device_type": "mirrorless_or_dslr",
+            "device_type_label": "Custom Test Camera",
+            "sensor_format": "full_frame",
+            "sensor_format_label": "Full-Frame (35mm)",
+            "sensor_crop_factor": 1.0,
+            "summary": "Monkeypatched Camera Profile Active",
+            "candidates": [{"class": "dedicated_camera", "probability": 1.0}],
+            "why_believed": ["Monkeypatched test run"],
+            "why_doubted": [],
+        }
+
+    monkeypatch.setattr(CameraDetector, "detect", custom_detect)
+
+    # 3. Second run with same image and cache enabled (no_cache=False)
+    rep2 = run_analysis_pipeline(img_path, out_dir=tmp_path / "cam_run2", no_cache=False)
+    assert rep2 is not None
+
+    # Craft cache must have invalidated due to CameraDetector code modification
+    new_cam = rep2.global_analysis.camera.get("display_name")
+    assert new_cam == "Monkeypatched Custom Camera X99"
+
+
