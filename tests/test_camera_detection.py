@@ -74,6 +74,144 @@ def test_classify_camera_device_catalog():
     assert fuji_gfx["sensor_crop_factor"] == 0.79
 
 
+def test_camera_catalog_table_driven():
+    """Exhaustive table-driven test verifying >= 60 make/model pairs and edge cases."""
+    test_cases = [
+        # (Make, Model, Expected Device Type, Expected Sensor Format, Expected Crop Factor)
+        # Nikon DX
+        ("Nikon", "D3500", "dslr", "aps_c", 1.5),
+        ("Nikon", "D5600", "dslr", "aps_c", 1.5),
+        ("Nikon", "D7500", "dslr", "aps_c", 1.5),
+        ("Nikon", "D500", "dslr", "aps_c", 1.5),
+        ("Nikon", "D300s", "dslr", "aps_c", 1.5),
+        ("Nikon", "D90", "dslr", "aps_c", 1.5),
+        ("Nikon", "Z 50", "mirrorless", "aps_c", 1.5),
+        ("Nikon", "Z fc", "mirrorless", "aps_c", 1.5),
+        ("Nikon", "Z 30", "mirrorless", "aps_c", 1.5),
+        # Nikon FX
+        ("NIKON CORPORATION", "NIKON D850", "dslr", "full_frame", 1.0),
+        ("Nikon", "D810", "dslr", "full_frame", 1.0),
+        ("Nikon", "D780", "dslr", "full_frame", 1.0),
+        ("Nikon", "D750", "dslr", "full_frame", 1.0),
+        ("Nikon", "D6", "dslr", "full_frame", 1.0),
+        ("Nikon", "D5", "dslr", "full_frame", 1.0),
+        ("Nikon", "Df", "dslr", "full_frame", 1.0),
+        ("Nikon", "Z 8", "mirrorless", "full_frame", 1.0),
+        ("Nikon", "Z 6_2", "mirrorless", "full_frame", 1.0),
+        ("Nikon", "Z f", "mirrorless", "full_frame", 1.0),
+        ("Nikon", "Nikon 1 J5", "mirrorless", "one_inch", 2.7),
+        ("Nikon", "COOLPIX P1000", "compact", "1/2.3_inch", 5.6),
+        # Canon Compact
+        ("Canon", "IXUS 185", "compact", "1/2.3_inch", 5.6),
+        ("Canon", "IXY 650", "compact", "1/2.3_inch", 5.6),
+        ("Canon", "PowerShot G7 X Mark III", "compact", "one_inch", 2.7),
+        ("Canon", "PowerShot SX740 HS", "compact", "1/2.3_inch", 5.6),
+        # Canon Mirrorless & DSLR Full-Frame
+        ("Canon", "EOS R5", "mirrorless", "full_frame", 1.0),
+        ("Canon", "EOS R6 Mark II", "mirrorless", "full_frame", 1.0),
+        ("Canon", "EOS RP", "mirrorless", "full_frame", 1.0),
+        ("Canon", "EOS 5D Mark IV", "dslr", "full_frame", 1.0),
+        ("Canon", "EOS 6D", "dslr", "full_frame", 1.0),
+        ("Canon", "EOS-1D X Mark III", "dslr", "full_frame", 1.0),
+        # Canon Mirrorless & DSLR APS-C
+        ("Canon", "EOS R7", "mirrorless", "aps_c", 1.6),
+        ("Canon", "EOS R10", "mirrorless", "aps_c", 1.6),
+        ("Canon", "EOS R50", "mirrorless", "aps_c", 1.6),
+        ("Canon", "EOS M50 Mark II", "mirrorless", "aps_c", 1.6),
+        ("Canon", "EOS 7D Mark II", "dslr", "aps_c", 1.6),
+        ("Canon", "EOS 90D", "dslr", "aps_c", 1.6),
+        ("Canon", "EOS Rebel T7i", "dslr", "aps_c", 1.6),
+        ("Canon", "EOS 850D", "dslr", "aps_c", 1.6),
+        # Sony Compact
+        ("Sony", "DSC-W830", "compact", "1/2.3_inch", 5.6),
+        ("Sony", "DSC-HX400V", "compact", "1/2.3_inch", 5.6),
+        ("Sony", "DSC-RX100M7", "compact", "one_inch", 2.7),
+        ("Sony", "ZV-1", "compact", "one_inch", 2.7),
+        ("Sony", "DSC-RX1R", "compact", "full_frame", 1.0),
+        # Sony Phone
+        ("Sony", "XQ-BC52", "smartphone", "smartphone_small", 4.0),
+        ("Sony", "Xperia 1 V", "smartphone", "smartphone_small", 4.0),
+        # Sony Mirrorless APS-C
+        ("Sony", "ILCE-6700", "mirrorless", "aps_c", 1.5),
+        ("Sony", "ILCE-6400", "mirrorless", "aps_c", 1.5),
+        ("Sony", "ZV-E10", "mirrorless", "aps_c", 1.5),
+        ("Sony", "NEX-5N", "mirrorless", "aps_c", 1.5),
+        # Sony Mirrorless Full-Frame
+        ("Sony", "ILCE-7M4", "mirrorless", "full_frame", 1.0),
+        ("Sony", "ILCE-7RM5", "mirrorless", "full_frame", 1.0),
+        ("Sony", "ILCE-1", "mirrorless", "full_frame", 1.0),
+        ("Sony", "FX3", "mirrorless", "full_frame", 1.0),
+        ("Sony", "ZV-E1", "mirrorless", "full_frame", 1.0),
+        # Leica
+        ("Leica", "CL", "mirrorless", "aps_c", 1.5),
+        ("Leica", "TL2", "mirrorless", "aps_c", 1.5),
+        ("Leica", "D-LUX 7", "compact", "micro_four_thirds", 2.0),
+        ("Leica", "Q3", "mirrorless", "full_frame", 1.0),
+        ("Leica", "SL2", "mirrorless", "full_frame", 1.0),
+        ("Leica", "M11", "mirrorless", "full_frame", 1.0),
+        ("Leica", "S3", "dslr", "medium_format", 0.79),
+        # Panasonic
+        ("Panasonic", "DC-S5", "mirrorless", "full_frame", 1.0),
+        ("Panasonic", "DC-S1H", "mirrorless", "full_frame", 1.0),
+        ("Panasonic", "DMC-FZ1000", "compact", "one_inch", 2.7),
+        ("Panasonic", "DC-GH6", "mirrorless", "micro_four_thirds", 2.0),
+        ("Panasonic", "DC-G9", "mirrorless", "micro_four_thirds", 2.0),
+        # Pentax
+        ("Pentax", "K-1", "dslr", "full_frame", 1.0),
+        ("Pentax", "K-3 Mark III", "dslr", "aps_c", 1.5),
+        ("Pentax", "K-70", "dslr", "aps_c", 1.5),
+        ("Pentax", "645Z", "dslr", "medium_format", 0.79),
+        # Sigma
+        ("Sigma", "fp", "mirrorless", "full_frame", 1.0),
+        ("Sigma", "fp L", "mirrorless", "full_frame", 1.0),
+        ("Sigma", "sd Quattro", "mirrorless", "aps_c", 1.5),
+        # Fujifilm
+        ("Fujifilm", "FinePix S5700", "compact", "1/2.5_inch", 6.0),
+        ("Fujifilm", "X100V", "compact", "aps_c", 1.5),
+        ("Fujifilm", "X-T5", "mirrorless", "aps_c", 1.5),
+        ("Fujifilm", "GFX 100 II", "medium_format", "medium_format", 0.79),
+        # DJI
+        ("DJI", "FC2103", "drone", "one_inch", 2.7),
+        ("DJI", "Osmo Pocket 3", "action_cam", "one_inch", 2.7),
+        ("DJI", "FC3582", "drone", "micro_four_thirds", 2.0),
+        ("DJI", "Mini 4 Pro", "drone", "1/1.3_inch", 3.2),
+        # Hasselblad
+        ("Hasselblad", "L1D-20c", "drone", "one_inch", 2.7),
+        ("Hasselblad", "X2D 100C", "medium_format", "medium_format", 0.79),
+        # Apple
+        ("Apple", "iPad Pro", "tablet", "smartphone_small", 4.0),
+        ("Apple", "iPhone 15 Pro Max", "smartphone", "smartphone_large_sensor", 3.2),
+        ("Apple", "iPhone 13", "smartphone", "smartphone_small", 4.0),
+        # Samsung
+        ("Samsung", "SM-S918B", "smartphone", "smartphone_large_sensor", 3.2),
+        ("Samsung", "SM-S928B", "smartphone", "smartphone_large_sensor", 3.2),
+        ("Samsung", "SM-A546B", "smartphone", "smartphone_small", 4.0),
+        # Google
+        ("Google", "Pixel 8 Pro", "smartphone", "smartphone_large_sensor", 3.2),
+        ("Google", "Pixel 7a", "smartphone", "smartphone_small", 4.0),
+        # African & Budget Smartphones
+        ("Tecno", "CK7n", "smartphone", "smartphone_small", 4.0),
+        ("Infinix", "X6816", "smartphone", "smartphone_small", 4.0),
+        ("itel", "A662LM", "smartphone", "smartphone_small", 4.0),
+        ("realme", "RMX3363", "smartphone", "smartphone_small", 4.0),
+        ("Nokia", "G20", "smartphone", "smartphone_small", 4.0),
+        ("Nokia", "TA-1336", "smartphone", "smartphone_small", 4.0),
+        # Unknown cases (MUST yield unknown, never confident hallucinations)
+        ("Acme", "SuperCam 9000", "unknown", "unknown", None),
+        ("Canon", "NonExistentModelXYZ", "unknown", "unknown", None),
+        ("Sony", "RandomGizmo123", "unknown", "unknown", None),
+        ("TotallyUnknownMake", "Unknown123", "unknown", "unknown", None),
+    ]
+
+    assert len(test_cases) >= 60, f"Expected >= 60 test cases, got {len(test_cases)}"
+
+    for make, model, exp_type, exp_format, exp_crop in test_cases:
+        res = classify_camera_device(make, model)
+        assert res["device_type"] == exp_type, f"Failed type for {make} {model}: got {res['device_type']}, expected {exp_type}"
+        assert res["sensor_format"] == exp_format, f"Failed sensor for {make} {model}: got {res['sensor_format']}, expected {exp_format}"
+        assert res["sensor_crop_factor"] == exp_crop, f"Failed crop for {make} {model}: got {res['sensor_crop_factor']}, expected {exp_crop}"
+
+
 def test_hardware_exif_camera_detection(tmp_path: Path):
     """Test extracting camera specs from an image with genuine EXIF data."""
     img_path = tmp_path / "sony_photo.jpg"

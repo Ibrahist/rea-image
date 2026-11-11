@@ -1,0 +1,490 @@
+# Camera hardware classification catalog: ordered regex rules mapping Make and Model
+# to device types, sensor formats, and crop factors.
+
+rules:
+  # =========================================================================
+  # Specific Drone / Action Hardware (prioritized over brand umbrella rules)
+  # =========================================================================
+  - make: "hasselblad"
+    model: '\bl1d-20c\b'
+    device_type: "drone"
+    sensor_format: "one_inch"
+    crop_factor: 2.7
+
+  - make: "dji"
+    model: '\bfc2103\b'
+    device_type: "drone"
+    sensor_format: "one_inch"
+    crop_factor: 2.7
+
+  - make: "dji"
+    model: '(?:osmo\s*)?pocket\s*3'
+    device_type: "action_cam"
+    sensor_format: "one_inch"
+    crop_factor: 2.7
+
+  - make: "dji"
+    model: '\b(?:fc3411|air\s*2s)\b'
+    device_type: "drone"
+    sensor_format: "one_inch"
+    crop_factor: 2.7
+
+  - make: "dji"
+    model: '\b(?:fc3582|mavic\s*3)\b'
+    device_type: "drone"
+    sensor_format: "micro_four_thirds"
+    crop_factor: 2.0
+
+  - make: "dji"
+    model: '\b(?:osmo\s*action|action\s*[2-5])\b'
+    device_type: "action_cam"
+    sensor_format: "1/1.3_inch"
+    crop_factor: 3.2
+
+  - make: "dji"
+    model: '\b(?:mini\s*[34]|air\s*3|fc3590|fc4\d+)\b'
+    device_type: "drone"
+    sensor_format: "1/1.3_inch"
+    crop_factor: 3.2
+
+  - make: "dji"
+    model: '.*'
+    device_type: "drone"
+    sensor_format: "1/1.3_inch"
+    crop_factor: 3.2
+
+  - make: "gopro"
+    model: '.*'
+    device_type: "action_cam"
+    sensor_format: "1/1.9_inch"
+    crop_factor: 4.5
+
+  - make: "insta360"
+    model: '.*'
+    device_type: "action_cam"
+    sensor_format: "1/1.9_inch"
+    crop_factor: 4.5
+
+  # =========================================================================
+  # Apple
+  # =========================================================================
+  - make: "apple"
+    model: '\bipad\b'
+    device_type: "tablet"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  - make: "apple"
+    model: '\biphone\s*1[4-6]\s*pro\b'
+    device_type: "smartphone"
+    sensor_format: "smartphone_large_sensor"
+    crop_factor: 3.2
+
+  - make: "apple"
+    model: '\biphone\b'
+    device_type: "smartphone"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  # =========================================================================
+  # Samsung
+  # =========================================================================
+  - make: "samsung"
+    model: '\b(?:sm-s9[012]8[a-z0-9]*|galaxy\s*s2[234]\s*ultra)\b'
+    device_type: "smartphone"
+    sensor_format: "smartphone_large_sensor"
+    crop_factor: 3.2
+
+  - make: "samsung"
+    model: '\b(?:sm-[sagf]\d{3}[a-z0-9]*|galaxy)\b'
+    device_type: "smartphone"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  # =========================================================================
+  # Google
+  # =========================================================================
+  - make: "google"
+    model: '\bpixel\s*(?:[789]|10)\s*pro\b'
+    device_type: "smartphone"
+    sensor_format: "smartphone_large_sensor"
+    crop_factor: 3.2
+
+  - make: "google"
+    model: '\bpixel\b'
+    device_type: "smartphone"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  # =========================================================================
+  # African & Global Budget Smartphone Brands
+  # =========================================================================
+  - make: "tecno"
+    model: '.*'
+    device_type: "smartphone"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  - make: "infinix"
+    model: '.*'
+    device_type: "smartphone"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  - make: "itel"
+    model: '.*'
+    device_type: "smartphone"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  - make: "realme"
+    model: '.*'
+    device_type: "smartphone"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  - make: "nokia|hmd"
+    model: '.*'
+    device_type: "smartphone"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  # Catch African model numbers directly (even if Make tag is generic)
+  - make: ".*"
+    model: '\b(?:ck7n|cg\d+|kg\d+|x6816|x\d{4}[a-z]?|a662lm|a\d{3}[a-z0-9]*|rmx\d{4}|ta-\d{4}|g20)\b'
+    device_type: "smartphone"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  - make: "xiaomi|redmi|poco|oneplus|oppo|vivo|motorola|huawei"
+    model: '.*'
+    device_type: "smartphone"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  # =========================================================================
+  # Nikon
+  # =========================================================================
+  # Nikon DX 4-digit DSLRs & DX models (D3xxx, D5xxx, D7xxx, D500, D300, D200, D100, D90..D40)
+  - make: "nikon"
+    model: '\b(?:d[357]\d{3}|d500|d300s?|d200|d100|d[4-9]0|d[12][a-z]*)\b'
+    device_type: "dslr"
+    sensor_format: "aps_c"
+    crop_factor: 1.5
+
+  # Nikon DX Mirrorless (Z50, Z30, Z fc)
+  - make: "nikon"
+    model: '\bz\s*(?:50|30|fc)\b'
+    device_type: "mirrorless"
+    sensor_format: "aps_c"
+    crop_factor: 1.5
+
+  # Nikon FX DSLRs (D6xx, D7xx, D8xx, Df, D3, D4, D5, D6)
+  - make: "nikon"
+    model: '\b(?:d[678]\d{2}|df|d[3-6][xs]?)\b'
+    device_type: "dslr"
+    sensor_format: "full_frame"
+    crop_factor: 1.0
+
+  # Nikon FX Mirrorless (Z5, Z6, Z7, Z8, Z9, Zf)
+  - make: "nikon"
+    model: '\bz\s*(?:[5-9]|f\b)[a-z0-9_]*'
+    device_type: "mirrorless"
+    sensor_format: "full_frame"
+    crop_factor: 1.0
+
+  # Nikon 1 Series (CX 1-inch)
+  - make: "nikon"
+    model: '\b(?:nikon\s*1|1\s*(?:v[1-3]|j[1-5]|s[1-2]|aw1))\b'
+    device_type: "mirrorless"
+    sensor_format: "one_inch"
+    crop_factor: 2.7
+
+  # Nikon Coolpix compacts
+  - make: "nikon"
+    model: '\bcoolpix\b'
+    device_type: "compact"
+    sensor_format: "1/2.3_inch"
+    crop_factor: 5.6
+
+  # =========================================================================
+  # Canon
+  # =========================================================================
+  # Canon Compacts (IXUS / IXY / PowerShot)
+  - make: "canon"
+    model: '\b(?:ixus|ixy)\b'
+    device_type: "compact"
+    sensor_format: "1/2.3_inch"
+    crop_factor: 5.6
+
+  - make: "canon"
+    model: '\bpowershot\s*g[3579]\s*x\b'
+    device_type: "compact"
+    sensor_format: "one_inch"
+    crop_factor: 2.7
+
+  - make: "canon"
+    model: '\bpowershot\b'
+    device_type: "compact"
+    sensor_format: "1/2.3_inch"
+    crop_factor: 5.6
+
+  # Canon Mirrorless APS-C (EOS R7, R10, R50, R100, EOS M)
+  - make: "canon"
+    model: '\b(?:eos\s*r(?:7|10|50|100)|eos\s*m\d*)\b'
+    device_type: "mirrorless"
+    sensor_format: "aps_c"
+    crop_factor: 1.6
+
+  # Canon Mirrorless Full-Frame (EOS R3, R5, R6, R8, RP, R, Ra)
+  - make: "canon"
+    model: '\beos\s*r(?:[3568]|p|a|\b)[a-z0-9\s_]*'
+    device_type: "mirrorless"
+    sensor_format: "full_frame"
+    crop_factor: 1.0
+
+  # Canon Full-Frame DSLRs (1D, 5D, 6D series)
+  - make: "canon"
+    model: '\beos[\s-]*(?:1d|5d|6d)\b'
+    device_type: "dslr"
+    sensor_format: "full_frame"
+    crop_factor: 1.0
+
+  # Canon APS-C DSLRs (7D, xxD, xxxD, xxxxD, Rebel, Kiss)
+  - make: "canon"
+    model: '\b(?:eos[\s-]*(?:7d|[1-9]0d|\d{3,4}d)|rebel|kiss)\b'
+    device_type: "dslr"
+    sensor_format: "aps_c"
+    crop_factor: 1.6
+
+  # =========================================================================
+  # Sony
+  # =========================================================================
+  # Sony Xperia Phones
+  - make: "sony"
+    model: '\b(?:xperia|xq-[a-z0-9]+|so-[a-z0-9]+)\b'
+    device_type: "smartphone"
+    sensor_format: "smartphone_small"
+    crop_factor: 4.0
+
+  # Sony Cyber-shot Compacts (DSC-W, DSC-H, DSC-T, DSC-S, etc.)
+  - make: "sony"
+    model: '\bdsc-(?:w|h|hx|t|s|wx)\d+'
+    device_type: "compact"
+    sensor_format: "1/2.3_inch"
+    crop_factor: 5.6
+
+  # Sony RX100 series, RX10 series, ZV-1 (1-inch sensor)
+  - make: "sony"
+    model: '\b(?:rx100\w*|rx10\w*|zv-1|zv-1f)\b'
+    device_type: "compact"
+    sensor_format: "one_inch"
+    crop_factor: 2.7
+
+  # Sony RX1 series (Full-Frame compact)
+  - make: "sony"
+    model: '\b(?:rx1|rx1r\w*)\b'
+    device_type: "compact"
+    sensor_format: "full_frame"
+    crop_factor: 1.0
+
+  # Sony Mirrorless APS-C (ILCE-3xxx/5xxx/6xxx, a6xxx, NEX, ZV-E10)
+  - make: "sony"
+    model: '\b(?:ilce-[356]\d{3}|a[356]\d{3}|nex-[a-z0-9]+|zv-e10)\b'
+    device_type: "mirrorless"
+    sensor_format: "aps_c"
+    crop_factor: 1.5
+
+  # Sony Mirrorless / Cinema Full-Frame (ILCE-7/9/1, a7/a9/a1, FX3/6/9, ZV-E1)
+  - make: "sony"
+    model: '\b(?:ilce-[791]\w*|a[791]\w*|fx[369]\w*|zv-e1\b)'
+    device_type: "mirrorless"
+    sensor_format: "full_frame"
+    crop_factor: 1.0
+
+  # =========================================================================
+  # Leica
+  # =========================================================================
+  # Leica APS-C (CL, TL, TL2, T)
+  - make: "leica"
+    model: '\b(?:cl|tl2?|t)\b'
+    device_type: "mirrorless"
+    sensor_format: "aps_c"
+    crop_factor: 1.5
+
+  # Leica MFT / Compact (D-Lux, C-Lux, V-Lux, Digilux)
+  - make: "leica"
+    model: '\b(?:d-lux|c-lux|v-lux|digilux)\b'
+    device_type: "compact"
+    sensor_format: "micro_four_thirds"
+    crop_factor: 2.0
+
+  # Leica Medium Format (S series)
+  - make: "leica"
+    model: '\bs(?:[23]|typ\s*007)\b'
+    device_type: "dslr"
+    sensor_format: "medium_format"
+    crop_factor: 0.79
+
+  # Leica Full-Frame (Q, SL, M series)
+  - make: "leica"
+    model: '\b(?:q[23]?|sl[23]?-?[a-z]?|m(?:1[01]|[1-9]|-(?:p|e|d)|typ\s*2\d\d))\b'
+    device_type: "mirrorless"
+    sensor_format: "full_frame"
+    crop_factor: 1.0
+
+  # =========================================================================
+  # Panasonic
+  # =========================================================================
+  # Lumix DC-S Full-Frame (S1, S5, S9 series)
+  - make: "panasonic"
+    model: '\b(?:dc-s[159]\w*|lumix\s*s[159]\w*)\b'
+    device_type: "mirrorless"
+    sensor_format: "full_frame"
+    crop_factor: 1.0
+
+  # Lumix 1-inch bridge / compact (FZ1000, FZ2500, LX10)
+  - make: "panasonic"
+    model: '\b(?:dc-|dmc-)?(?:fz(?:1000|2500)|lx10\b)\b'
+    device_type: "compact"
+    sensor_format: "one_inch"
+    crop_factor: 2.7
+
+  # Lumix small-sensor compact / bridge (FZ80, FZ300, ZS/TZ)
+  - make: "panasonic"
+    model: '\b(?:dc-|dmc-)?(?:fz\d+|zs\d+|tz\d+)\b'
+    device_type: "compact"
+    sensor_format: "1/2.3_inch"
+    crop_factor: 5.6
+
+  # Lumix MFT (GH series, G series, GX series, LX100)
+  - make: "panasonic"
+    model: '\b(?:dc-g\w*|dmc-g\w*|gh[1-7]\w*|g9\w*|gx\w*|lx100\w*)\b'
+    device_type: "mirrorless"
+    sensor_format: "micro_four_thirds"
+    crop_factor: 2.0
+
+  # =========================================================================
+  # Pentax
+  # =========================================================================
+  # Pentax Full-Frame (K-1 series)
+  - make: "pentax"
+    model: '\bk-1\b'
+    device_type: "dslr"
+    sensor_format: "full_frame"
+    crop_factor: 1.0
+
+  # Pentax Medium Format (645D, 645Z)
+  - make: "pentax"
+    model: '\b645[dz]\b'
+    device_type: "dslr"
+    sensor_format: "medium_format"
+    crop_factor: 0.79
+
+  # Pentax APS-C DSLRs (K-3, K-5, K-7, K-30, K-50, K-70, KF, KP, K-x, K-r)
+  - make: "pentax"
+    model: '\bk-(?:3|5|7|x|r|30|50|70|f|p)\b'
+    device_type: "dslr"
+    sensor_format: "aps_c"
+    crop_factor: 1.5
+
+  # Pentax Q (small sensor)
+  - make: "pentax"
+    model: '\b(?:pentax\s*)?q\b'
+    device_type: "mirrorless"
+    sensor_format: "1/2.3_inch"
+    crop_factor: 5.6
+
+  # =========================================================================
+  # Sigma
+  # =========================================================================
+  # Sigma fp / fp L (Full-Frame mirrorless)
+  - make: "sigma"
+    model: '\bfp\s*l?\b'
+    device_type: "mirrorless"
+    sensor_format: "full_frame"
+    crop_factor: 1.0
+
+  # Sigma sd Quattro / DP Merrill (APS-C)
+  - make: "sigma"
+    model: '\b(?:sd\s*quattro|dp\d+\s*(?:merrill|quattro)?)\b'
+    device_type: "mirrorless"
+    sensor_format: "aps_c"
+    crop_factor: 1.5
+
+  # =========================================================================
+  # Fujifilm
+  # =========================================================================
+  # Fujifilm GFX Medium Format
+  - make: "fujifilm|fuji"
+    model: '\bgfx\s*\d+\w*\b'
+    device_type: "medium_format"
+    sensor_format: "medium_format"
+    crop_factor: 0.79
+
+  # Fujifilm FinePix compact / bridge
+  - make: "fujifilm|fuji"
+    model: '\bfinepix\b'
+    device_type: "compact"
+    sensor_format: "1/2.5_inch"
+    crop_factor: 6.0
+
+  # Fujifilm X100 series (compact APS-C)
+  - make: "fujifilm|fuji"
+    model: '\bx100\w*\b'
+    device_type: "compact"
+    sensor_format: "aps_c"
+    crop_factor: 1.5
+
+  # Fujifilm X-series mirrorless APS-C (X-T, X-Pro, X-E, X-S, X-H)
+  - make: "fujifilm|fuji"
+    model: '\bx-(?:t|pro|e|s|h|m|a)\d*\w*\b'
+    device_type: "mirrorless"
+    sensor_format: "aps_c"
+    crop_factor: 1.5
+
+  # =========================================================================
+  # Hasselblad
+  # =========================================================================
+  - make: "hasselblad"
+    model: '\b(?:x1d|x2d|907x|h[1-6]d)\w*\b'
+    device_type: "medium_format"
+    sensor_format: "medium_format"
+    crop_factor: 0.79
+
+  - make: "hasselblad"
+    model: '.*'
+    device_type: "medium_format"
+    sensor_format: "medium_format"
+    crop_factor: 0.79
+
+  # =========================================================================
+  # Olympus / OM System (Micro Four Thirds)
+  # =========================================================================
+  - make: "olympus|om system"
+    model: '\b(?:tough|tg-[1-7])\b'
+    device_type: "compact"
+    sensor_format: "1/2.3_inch"
+    crop_factor: 5.6
+
+  - make: "olympus|om system"
+    model: '.*'
+    device_type: "mirrorless"
+    sensor_format: "micro_four_thirds"
+    crop_factor: 2.0
+
+  # =========================================================================
+  # Ricoh
+  # =========================================================================
+  # Ricoh GR series (APS-C compact)
+  - make: "ricoh"
+    model: '\bgr\s*(?:iii?x?|[12])?\b'
+    device_type: "compact"
+    sensor_format: "aps_c"
+    crop_factor: 1.5
+
+  - make: "ricoh"
+    model: '\b(?:theta|wg-\d+)\b'
+    device_type: "compact"
+    sensor_format: "1/2.3_inch"
+    crop_factor: 5.6

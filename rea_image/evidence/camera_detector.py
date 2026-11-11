@@ -10,7 +10,7 @@ from fractions import Fraction
 import logging
 from pathlib import Path
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 import numpy as np
 from PIL import ExifTags, Image
 from scipy.ndimage import laplace
@@ -51,6 +51,14 @@ MAKE_CANONICAL: Dict[str, str] = {
     "motorola": "Motorola",
     "pentax": "Pentax",
     "sigma": "Sigma",
+    "tecno": "Tecno",
+    "tecno mobile limited": "Tecno",
+    "infinix": "Infinix",
+    "infinix mobility limited": "Infinix",
+    "itel": "itel",
+    "realme": "realme",
+    "nokia": "Nokia",
+    "hmd global": "Nokia",
 }
 
 
@@ -115,6 +123,24 @@ def _format_exposure_time(val: Any) -> Optional[str]:
 # Camera Classification Rules
 # ---------------------------------------------------------------------------
 
+_CAMERAS_CATALOG: Optional[List[Dict[str, Any]]] = None
+
+
+def load_camera_catalog() -> List[Dict[str, Any]]:
+    """Load ordered regex rules from rea_image/capabilities/cameras.yaml."""
+    global _CAMERAS_CATALOG
+    if _CAMERAS_CATALOG is None:
+        yaml_path = Path(__file__).parent.parent / "capabilities" / "cameras.yaml"
+        if yaml_path.exists():
+            import yaml
+            with open(yaml_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+                _CAMERAS_CATALOG = data.get("rules", [])
+        else:
+            _CAMERAS_CATALOG = []
+    return _CAMERAS_CATALOG
+
+
 def classify_camera_device(make_raw: str, model_raw: str, lens_raw: str = "") -> Dict[str, Any]:
     """Classify camera device type, sensor format, and crop factor from make and model."""
     make_lower = make_raw.lower().strip()
@@ -130,159 +156,36 @@ def classify_camera_device(make_raw: str, model_raw: str, lens_raw: str = "") ->
     if not canonical_make:
         canonical_make = make_raw.strip().title() if make_raw else "Unknown"
 
+    rules = load_camera_catalog()
     device_type = "unknown"
     sensor_format = "unknown"
     crop_factor: Optional[float] = None
-    clean_model = model_raw.strip()
 
-    # 1. Smartphones
-    if any(m in make_lower for m in ("apple", "google", "samsung", "xiaomi", "huawei", "oneplus", "oppo", "vivo", "motorola")) or \
-       any(p in model_lower for p in ("iphone", "pixel", "galaxy", "sm-s", "sm-g", "sm-f", "sm-a", "redmi")):
-        device_type = "smartphone"
-        sensor_format = "smartphone_small"
-        crop_factor = 4.0
-        # Refine sensor class for flagship large-sensor phones
-        if any(f in model_lower for f in ("14 pro", "15 pro", "16 pro", "ultra", "pixel 7 pro", "pixel 8 pro", "pixel 9 pro")):
-            sensor_format = "smartphone_large_sensor"
-            crop_factor = 3.2
+    for rule in rules:
+        make_pat = rule.get("make")
+        model_pat = rule.get("model")
 
-    # 2. DJI Drones
-    elif "dji" in make_lower or "mavic" in model_lower or "fc3" in model_lower or "mini" in model_lower and "dji" in make_lower:
-        device_type = "drone"
-        sensor_format = "1/1.3_inch"
-        crop_factor = 3.2
+        make_match = True
+        if make_pat:
+            make_match = bool(re.search(make_pat, make_lower) or re.search(make_pat, model_lower))
 
-    # 3. Action Cameras (GoPro / Insta360)
-    elif "gopro" in make_lower or "hero" in model_lower or "insta360" in make_lower:
-        device_type = "action_cam"
-        sensor_format = "1/1.9_inch"
-        crop_factor = 4.5
+        if not make_match:
+            continue
 
-    # 4. Sony
-    elif "sony" in make_lower or "ilce" in model_lower:
-        if any(s in model_lower for s in ("ilce-7", "ilce-9", "ilce-1", "a7", "a9", "a1", "fx3", "fx6", "zv-e1")):
-            device_type = "mirrorless"
-            sensor_format = "full_frame"
-            crop_factor = 1.0
-        elif any(s in model_lower for s in ("ilce-6", "ilce-5", "a6", "zv-e10", "nex")):
-            device_type = "mirrorless"
-            sensor_format = "aps_c"
-            crop_factor = 1.5
-        elif "rx100" in model_lower or "zv-1" in model_lower:
-            device_type = "compact"
-            sensor_format = "one_inch"
-            crop_factor = 2.7
-        else:
-            device_type = "mirrorless"
-            sensor_format = "full_frame"
-            crop_factor = 1.0
+        model_match = True
+        if model_pat:
+            model_match = bool(re.search(model_pat, model_lower))
 
-    # 5. Canon
-    elif "canon" in make_lower:
-        # Canon EOS R full-frame
-        if re.search(r"eos\s*r([3568]|p|\b)", model_lower) and not re.search(r"eos\s*r(7|10|50|100)\b", model_lower):
-            device_type = "mirrorless"
-            sensor_format = "full_frame"
-            crop_factor = 1.0
-        # Canon EOS R APS-C or EOS M
-        elif re.search(r"eos\s*r(7|10|50|100)\b", model_lower) or "eos m" in model_lower:
-            device_type = "mirrorless"
-            sensor_format = "aps_c"
-            crop_factor = 1.6
-        # Canon EOS DSLR Full-Frame (5D, 6D, 1D)
-        elif any(d in model_lower for d in ("5d", "6d", "1d")):
-            device_type = "dslr"
-            sensor_format = "full_frame"
-            crop_factor = 1.0
-        # Canon EOS DSLR APS-C (7D, 80D, 90D, Rebel, xxxD)
-        elif any(d in model_lower for d in ("7d", "80d", "90d", "70d", "rebel", "kiss", "eos")) or "powershot" not in model_lower:
-            device_type = "dslr"
-            sensor_format = "aps_c"
-            crop_factor = 1.6
-        elif "powershot" in model_lower:
-            device_type = "compact"
-            sensor_format = "one_inch"
-            crop_factor = 2.7
+        if model_match:
+            device_type = rule.get("device_type", "unknown")
+            sensor_format = rule.get("sensor_format", "unknown")
+            crop_factor = rule.get("crop_factor")
+            break
 
-    # 6. Nikon
-    elif "nikon" in make_lower:
-        # Nikon Z full-frame
-        if re.search(r"\bz\s*([56789]|f)\b", model_lower) and not re.search(r"\bz\s*(30|50|fc)\b", model_lower):
-            device_type = "mirrorless"
-            sensor_format = "full_frame"
-            crop_factor = 1.0
-        # Nikon Z APS-C (DX)
-        elif re.search(r"\bz\s*(30|50|fc)\b", model_lower):
-            device_type = "mirrorless"
-            sensor_format = "aps_c"
-            crop_factor = 1.5
-        # Nikon DSLR Full-Frame (FX: D850, D810, D780, D750, D6, D5, D4, D3, Df)
-        elif any(d in model_lower for d in ("d850", "d810", "d800", "d780", "d750", "d700", "d6", "d5", "d4", "d3", "df")):
-            device_type = "dslr"
-            sensor_format = "full_frame"
-            crop_factor = 1.0
-        # Nikon DSLR APS-C (DX: D500, D7500, D7200, D5600, D3500)
-        elif re.search(r"\bd[0-9]{3,4}\b", model_lower):
-            device_type = "dslr"
-            sensor_format = "aps_c"
-            crop_factor = 1.5
-        else:
-            device_type = "mirrorless"
-            sensor_format = "full_frame"
-            crop_factor = 1.0
-
-    # 7. Fujifilm
-    elif "fujifilm" in make_lower or "fuji" in make_lower:
-        if "gfx" in model_lower:
-            device_type = "medium_format"
-            sensor_format = "medium_format"
-            crop_factor = 0.79
-        elif "x100" in model_lower:
-            device_type = "compact"
-            sensor_format = "aps_c"
-            crop_factor = 1.5
-        else:
-            device_type = "mirrorless"
-            sensor_format = "aps_c"
-            crop_factor = 1.5
-
-    # 8. Leica
-    elif "leica" in make_lower:
-        if "q" in model_lower or "m" in model_lower or "sl" in model_lower:
-            device_type = "mirrorless"
-            sensor_format = "full_frame"
-            crop_factor = 1.0
-        else:
-            device_type = "mirrorless"
-            sensor_format = "full_frame"
-            crop_factor = 1.0
-
-    # 9. Micro Four Thirds (Olympus, OM System, Panasonic Lumix G)
-    elif "olympus" in make_lower or "om system" in make_lower or ("panasonic" in make_lower and ("gh" in model_lower or "g9" in model_lower or "g8" in model_lower)):
-        device_type = "mirrorless"
-        sensor_format = "micro_four_thirds"
-        crop_factor = 2.0
-
-    # 10. Hasselblad
-    elif "hasselblad" in make_lower:
-        device_type = "medium_format"
-        sensor_format = "medium_format"
-        crop_factor = 0.79
-
-    # 11. Ricoh
-    elif "ricoh" in make_lower:
-        if "gr" in model_lower:
-            device_type = "compact"
-            sensor_format = "aps_c"
-            crop_factor = 1.5
-        else:
-            device_type = "compact"
-            sensor_format = "aps_c"
-            crop_factor = 1.5
-
-    # Build human-readable formatted name
+    # Build human-readable formatted names
     type_labels = {
         "smartphone": "Smartphone",
+        "tablet": "Tablet",
         "mirrorless": "Mirrorless Camera",
         "dslr": "DSLR Camera",
         "compact": "Compact Camera",
@@ -291,22 +194,34 @@ def classify_camera_device(make_raw: str, model_raw: str, lens_raw: str = "") ->
         "medium_format": "Medium Format Camera",
         "unknown": "Digital Camera",
     }
-    format_labels = {
-        "full_frame": "Full-Frame (35mm)",
-        "aps_c": "APS-C (1.5x crop)",
-        "micro_four_thirds": "Micro Four Thirds (2.0x crop)",
-        "one_inch": "1.0-inch Sensor",
-        "smartphone_small": "Smartphone Sensor (~1/1.3\" to 1/2.5\")",
-        "smartphone_large_sensor": "Large Smartphone Sensor (1/1.28\" Quad-Bayer)",
-        "1/1.3_inch": "1/1.3-inch Sensor",
-        "1/1.9_inch": "1/1.9-inch Sensor",
-        "medium_format": "Medium Format (0.79x crop)",
-        "unknown": "Standard Sensor",
-    }
 
-    display_name = f"{canonical_make} {clean_model}".strip()
+    if sensor_format == "aps_c":
+        cf = f"{crop_factor:.1f}" if crop_factor else "1.5"
+        sensor_format_label = f"APS-C ({cf}x crop)"
+    elif sensor_format == "medium_format":
+        cf = f"{crop_factor:.2f}" if crop_factor else "0.79"
+        sensor_format_label = f"Medium Format ({cf}x crop)"
+    else:
+        format_labels = {
+            "full_frame": "Full-Frame (35mm)",
+            "micro_four_thirds": "Micro Four Thirds (2.0x crop)",
+            "one_inch": "1.0-inch Sensor",
+            "smartphone_small": "Smartphone Sensor (~1/1.3\" to 1/2.5\")",
+            "smartphone_large_sensor": "Large Smartphone Sensor (1/1.28\" Quad-Bayer)",
+            "1/1.3_inch": "1/1.3-inch Sensor",
+            "1/1.9_inch": "1/1.9-inch Sensor",
+            "1/2.3_inch": "1/2.3-inch Sensor",
+            "1/2.5_inch": "1/2.5-inch Sensor",
+            "unknown": "Standard Sensor",
+        }
+        sensor_format_label = format_labels.get(sensor_format, "Standard Sensor")
+
+    clean_model = model_raw.strip()
+    display_name = f"{canonical_make} {clean_model}".strip() if clean_model else canonical_make
     if clean_model.lower().startswith(canonical_make.lower()):
         display_name = clean_model
+    if canonical_make == "Unknown" and not clean_model:
+        display_name = "Unknown Camera"
 
     return {
         "canonical_make": canonical_make,
@@ -314,7 +229,7 @@ def classify_camera_device(make_raw: str, model_raw: str, lens_raw: str = "") ->
         "device_type": device_type,
         "device_type_label": type_labels.get(device_type, "Digital Camera"),
         "sensor_format": sensor_format,
-        "sensor_format_label": format_labels.get(sensor_format, "Standard Sensor"),
+        "sensor_format_label": sensor_format_label,
         "sensor_crop_factor": crop_factor,
         "display_name": display_name,
     }
