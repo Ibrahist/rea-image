@@ -54,8 +54,8 @@ MAKE_CANONICAL: Dict[str, str] = {
 }
 
 
-def _clean_str(val: Any) -> str:
-    """Normalize string, handling bytes, NUL bytes, and whitespace."""
+def _clean_str(val: Any, max_len: int = 200) -> str:
+    """Normalize string, stripping control characters, NUL bytes, and capping length."""
     if val is None:
         return ""
     if isinstance(val, bytes):
@@ -63,7 +63,9 @@ def _clean_str(val: Any) -> str:
             val = val.decode("utf-8", errors="replace")
         except Exception:
             val = repr(val)
-    return str(val).strip("\x00 \t\r\n")
+    # Strip ASCII and Unicode control characters (except standard spaces)
+    s = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]", "", str(val)).strip()
+    return s[:max_len]
 
 
 def _format_rational(val: Any) -> Optional[float]:

@@ -1,7 +1,7 @@
 """Self-contained interactive HTML report generator."""
 
 from pathlib import Path
-from jinja2 import Template
+from jinja2 import Environment, select_autoescape
 from rea_image.schemas import ReportSchema
 
 
@@ -472,9 +472,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 
 def generate_report_html(report_data: ReportSchema, output_file: Path) -> Path:
-    """Render and write self-contained interactive report.html."""
+    """Render and write self-contained interactive report.html with autoescaping enabled."""
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    template = Template(HTML_TEMPLATE)
+    env = Environment(autoescape=select_autoescape(["html", "xml"]))
+    template = env.from_string(HTML_TEMPLATE)
     html_content = template.render(report=report_data)
     output_file.write_text(html_content, encoding="utf-8")
     return output_file

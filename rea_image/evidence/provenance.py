@@ -9,6 +9,19 @@ from rea_image.ingest.loader import IngestResult
 from rea_image.schemas import EvidenceItem, ProductionMethod
 
 
+def _clean_str(val: Any, max_len: int = 200) -> str:
+    """Normalize metadata string, removing control characters and capping length."""
+    if val is None:
+        return ""
+    if isinstance(val, bytes):
+        try:
+            val = val.decode("utf-8", errors="replace")
+        except Exception:
+            val = repr(val)
+    s = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]", "", str(val)).strip()
+    return s[:max_len]
+
+
 class ProvenanceDetector(BaseDetector):
     name = "provenance"
 
@@ -64,9 +77,9 @@ class ProvenanceDetector(BaseDetector):
         # 3. Camera EXIF details
         has_camera = bool(exif_data.get("Make") or exif_data.get("Model"))
         if has_camera:
-            make = exif_data.get("Make", "")
-            model = exif_data.get("Model", "")
-            lens = exif_data.get("LensModel", exif_data.get("LensMake", "Standard Lens"))
+            make = _clean_str(exif_data.get("Make", ""))
+            model = _clean_str(exif_data.get("Model", ""))
+            lens = _clean_str(exif_data.get("LensModel", exif_data.get("LensMake", "Standard Lens")))
             focal = exif_data.get("FocalLength")
             aperture = exif_data.get("FNumber")
             iso = exif_data.get("ISOSpeedRatings", exif_data.get("PhotographicSensitivity"))
@@ -139,7 +152,7 @@ class ProvenanceDetector(BaseDetector):
             )
 
         # 4. Software edit history
-        software = exif_data.get("Software") or xmp_data.get("creator_tool")
+        software = _clean_str(exif_data.get("Software") or xmp_data.get("creator_tool"))
         if software:
             sw_lower = software.lower()
             if any(k in sw_lower for k in ("photoshop", "lightroom", "gimp", "canva", "figma", "illustrator")):

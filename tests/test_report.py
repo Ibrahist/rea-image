@@ -77,3 +77,33 @@ def test_full_pipeline_and_bundle_export(tmp_path: Path):
     assert rebuilt_path.exists()
     assert html_file.exists()
 
+
+def test_html_report_xss_sanitization(tmp_path: Path):
+    """Regression test: Ensure EXIF tags with XSS payloads cannot inject raw HTML into report.html."""
+    from PIL import ExifTags
+    img_path = tmp_path / "xss_injection.jpg"
+    img = Image.new("RGB", (300, 200), color=(120, 140, 160))
+
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "<img src=x onerror=alert(1)>"
+    exif[ExifTags.Base.Model] = "<script>alert(2)</script>"
+    exif[ExifTags.Base.Software] = "<script>alert(3)</script>"
+
+    exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+    exif_ifd[ExifTags.Base.LensModel] = "<script>alert(4)</script>"
+    exif_ifd[ExifTags.Base.FocalLength] = (50, 1)
+
+    img.save(img_path, "JPEG", exif=exif)
+
+    out_dir = tmp_path / "xss_out"
+    run_analysis_pipeline(image_path=img_path, out_dir=out_dir, no_cache=True)
+
+    html_file = out_dir / "report.html"
+    assert html_file.exists()
+    html_text = html_file.read_text(encoding="utf-8")
+
+    # Assert no raw script or unescaped img tags from metadata appear in html_text
+    assert "<script>alert(" not in html_text
+    assert "<img src=x onerror=" not in html_text
+    assert "&lt;script&gt;alert(2)&lt;/script&gt;" in html_text or "&lt;img src=x" in html_text
+
