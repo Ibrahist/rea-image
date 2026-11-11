@@ -584,6 +584,7 @@ def provenance(
 @app.command()
 def camera(
     image: Path = typer.Argument(..., help="Path to image file."),
+    format: str = typer.Option("table", "--format", "-f", help="Output format: 'table' or 'json'."),
     json_out: bool = typer.Option(False, "--json", help="Output detected camera parameters as JSON."),
     redact_metadata: bool = typer.Option(False, "--redact-metadata", help="Redact capture timestamps and device serial numbers for privacy."),
 ):
@@ -591,11 +592,21 @@ def camera(
     import tempfile
     from rea_image.report.orchestrator import run_analysis_pipeline
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        report = run_analysis_pipeline(image_path=image, out_dir=Path(tmp_dir), no_cache=False, redact_metadata=redact_metadata)
+    if not image.exists() or not image.is_file():
+        console.print(f"[bold red]Error:[/bold red] File not found or unreadable: {image}")
+        raise typer.Exit(code=1)
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report = run_analysis_pipeline(image_path=image, out_dir=Path(tmp_dir), no_cache=False, redact_metadata=redact_metadata)
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] Failed to analyze camera for {image}: {e}")
+        raise typer.Exit(code=1)
+
     detected = getattr(report.global_analysis, "camera", {})
 
-    if json_out:
+    output_json = json_out or (format and format.lower() == "json")
+    if output_json:
         import json
         console.print_json(json.dumps(detected, ensure_ascii=False))
         return

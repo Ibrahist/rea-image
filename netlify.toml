@@ -1,3 +1,2 @@
 [build]
-  command = "cp docs/index.html index.html"
-  publish = "."
+  publish = "docs"

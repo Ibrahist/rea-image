@@ -711,3 +711,84 @@ def test_corroborate_exif_hypersmooth_pixels(tmp_path: Path):
         res = detector.detect(arr=arr, aspect_ratio="3:2", optical_craft={}, img=loaded, path=img_path)
     assert res["confidence"] == "low"
     assert any("Pixel noise profile is near-zero" in d for d in res["why_doubted"])
+
+
+def test_cli_camera_format_flag_and_missing_file(tmp_path: Path):
+    """Test camera CLI subcommand supports --format json and exits with 1 on missing file."""
+    # 1. Missing file -> exit code 1
+    res_missing = runner.invoke(app, ["camera", str(tmp_path / "nonexistent.png")])
+    assert res_missing.exit_code == 1
+    assert "File not found" in res_missing.output
+
+    # 2. --format json flag
+    img_path = tmp_path / "test_format.jpg"
+    arr = np.zeros((100, 100, 3), dtype=np.uint8)
+    Image.fromarray(arr).save(img_path)
+
+    res_json = runner.invoke(app, ["camera", str(img_path), "--format", "json"])
+    assert res_json.exit_code == 0
+    import json
+    data = json.loads(res_json.output)
+    assert "display_name" in data
+
+
+def test_camera_malformed_exif_zero_denominator_and_negative(tmp_path: Path):
+    """Test malformed EXIF with zero denominators, negative values, and raw bytes doesn't crash."""
+    detector = CameraDetector()
+
+    from unittest.mock import MagicMock
+    mock_img = MagicMock()
+    mock_exif = {
+        ExifTags.Base.Make: b"Canon\x00\x01",
+        ExifTags.Base.Model: b"EOS R5\x00",
+    }
+    mock_ifd = {
+        ExifTags.Base.FNumber: (1, 0),  # Zero denominator
+        ExifTags.Base.ExposureTime: (-1, 500),  # Negative value
+        ExifTags.Base.FocalLength: (0, 0),  # Zero denominator
+        ExifTags.Base.LensModel: b"RF24-70mm\x00",
+    }
+    mock_exif_obj = MagicMock()
+    mock_exif_obj.items.return_value = mock_exif.items()
+    mock_exif_obj.get_ifd.return_value = mock_ifd
+    mock_img.getexif.return_value = mock_exif_obj
+
+    hw = detector.extract_hardware_exif(img=mock_img, path=None)
+    assert hw is not None
+    assert hw["make"] == "Canon"
+    assert hw["model"] == "EOS R5"
+    assert hw["aperture"] is None
+    assert hw["shutter_speed"] is None
+    assert hw["focal_length"] is None
+
+
+def test_camera_detection_png_with_exif(tmp_path: Path):
+    """Test extracting camera hardware from a PNG file containing EXIF."""
+    img_path = tmp_path / "exif_photo.png"
+    img = Image.new("RGB", (200, 300), color=(140, 120, 100))
+
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Nikon"
+    exif[ExifTags.Base.Model] = "Z 8"
+    img.save(img_path, "PNG", exif=exif)
+
+    detector = CameraDetector()
+    with Image.open(img_path) as loaded:
+        hw = detector.extract_hardware_exif(img=loaded, path=img_path)
+    assert hw is not None
+    assert hw["make"] == "Nikon"
+    assert hw["model"] == "Z 8"
+    assert hw["sensor_format"] == "full_frame"
+
+
+def test_camera_cli_pure_pixel_ai_image():
+    """Test camera CLI command on AI image without PNG chunks does not crash."""
+    ai_img = Path("eval/benchmark_data/images/ai_heldout_ss.png")
+    if not ai_img.exists():
+        return
+
+    res = runner.invoke(app, ["camera", str(ai_img), "--format", "json"])
+    assert res.exit_code == 0
+    import json
+    data = json.loads(res.output)
+    assert "display_name" in data

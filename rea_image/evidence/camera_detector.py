@@ -106,7 +106,7 @@ def _format_exposure_time(val: Any) -> Optional[str]:
         return None
     num_val = _format_rational(val)
     if num_val is None or num_val <= 0:
-        return _clean_str(val)
+        return None
     if num_val >= 1.0:
         return f"{num_val:.1f}s" if num_val != int(num_val) else f"{int(num_val)}s"
     # Convert to standard fractional shutter notation (e.g. 1/250s)
@@ -490,7 +490,11 @@ class CameraDetector:
             lens = lens_make
 
         focal_raw = _format_rational(exif_dict.get("FocalLength"))
+        if focal_raw is not None and focal_raw <= 0:
+            focal_raw = None
         focal_35_raw = _format_rational(exif_dict.get("FocalLengthIn35mmFilm"))
+        if focal_35_raw is not None and focal_35_raw <= 0:
+            focal_35_raw = None
 
         # APEX conversion for aperture: f = 2^(Av / 2)
         fnumber = _format_rational(exif_dict.get("FNumber"))
@@ -498,6 +502,8 @@ class CameraDetector:
             aperture_val = fnumber
         else:
             aperture_val = _convert_apex_aperture(exif_dict.get("ApertureValue"))
+        if aperture_val is not None and aperture_val <= 0:
+            aperture_val = None
 
         # APEX conversion for shutter: t = 2^(-Tv)
         exp_time = _format_rational(exif_dict.get("ExposureTime"))
