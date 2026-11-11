@@ -5,8 +5,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from PIL import Image, ExifTags, IptcImagePlugin
 from rea_image.evidence.base import BaseDetector, make_evidence
+from rea_image.evidence.camera_detector import (
+    _convert_apex_aperture,
+    _convert_apex_shutter,
+    _format_exposure_time,
+)
 from rea_image.ingest.loader import IngestResult
-from rea_image.schemas import EvidenceItem, ProductionMethod
+from rea_image.schemas import EvidenceItem, ProductionMethod, clean_json_value, format_rational
 
 
 def _clean_str(val: Any, max_len: int = 200) -> str:
@@ -93,21 +98,33 @@ class ProvenanceDetector(BaseDetector):
             make = _clean_str(exif_data.get("Make", ""))
             model = _clean_str(exif_data.get("Model", ""))
             lens = _clean_str(exif_data.get("LensModel", exif_data.get("LensMake", "Standard Lens")))
-            focal = exif_data.get("FocalLength")
-            aperture = exif_data.get("FNumber")
-            iso = exif_data.get("ISOSpeedRatings", exif_data.get("PhotographicSensitivity"))
-            shutter = exif_data.get("ExposureTime")
+            focal = format_rational(exif_data.get("FocalLength"))
+            aperture = format_rational(exif_data.get("FNumber"))
+            if aperture is None or aperture <= 0:
+                aperture = _convert_apex_aperture(exif_data.get("ApertureValue"))
+
+            shutter_raw = format_rational(exif_data.get("ExposureTime"))
+            if shutter_raw is None or shutter_raw <= 0:
+                shutter_raw = _convert_apex_shutter(exif_data.get("ShutterSpeedValue"))
+            shutter_str = _format_exposure_time(shutter_raw) if shutter_raw else None
+
+            iso_raw = exif_data.get("ISOSpeedRatings", exif_data.get("PhotographicSensitivity"))
+            if isinstance(iso_raw, (list, tuple)) and iso_raw:
+                iso_raw = iso_raw[0]
+            iso = int(iso_raw) if (iso_raw is not None and str(iso_raw).isdigit()) else (iso_raw if iso_raw is not None else None)
 
             cam_str = f"{make} {model}".strip()
             details = []
             if lens:
                 details.append(f"lens {lens}")
-            if focal:
-                details.append(f"{focal}mm")
-            if aperture:
-                details.append(f"f/{aperture}")
-            if shutter:
-                details.append(f"{shutter}s")
+            if focal is not None and focal > 0:
+                focal_fmt = f"{int(focal)}mm" if focal == int(focal) else f"{focal:.1f}mm"
+                details.append(focal_fmt)
+            if aperture is not None and aperture > 0:
+                aperture_fmt = f"f/{aperture:.1f}" if aperture != int(aperture) else f"f/{int(aperture)}"
+                details.append(aperture_fmt)
+            if shutter_str:
+                details.append(shutter_str)
             if iso:
                 details.append(f"ISO {iso}")
 
@@ -122,7 +139,7 @@ class ProvenanceDetector(BaseDetector):
                         "focal_length": focal,
                         "aperture": aperture,
                         "iso": iso,
-                        "shutter": shutter,
+                        "shutter": shutter_str or shutter_raw,
                     },
                     direction=ProductionMethod.REAL_PHOTO.value,
                     strength=0.90,
@@ -201,13 +218,7 @@ class ProvenanceDetector(BaseDetector):
                 tag_name = ExifTags.TAGS.get(tag_id, str(tag_id))
                 if tag_name in PRIVACY_SENSITIVE_TAGS:
                     continue
-                # Decode bytes to string where readable
-                if isinstance(value, bytes):
-                    try:
-                        value = value.decode("utf-8", errors="replace").strip("\x00")
-                    except Exception:
-                        value = repr(value)
-                result[tag_name] = value
+                result[tag_name] = clean_json_value(value)
 
             # Also check Exif IFD for lens and shooting params
             try:
@@ -218,12 +229,7 @@ class ProvenanceDetector(BaseDetector):
                             name = ExifTags.TAGS.get(k, str(k))
                             if name in PRIVACY_SENSITIVE_TAGS:
                                 continue
-                            if isinstance(v, bytes):
-                                try:
-                                    v = v.decode("utf-8", errors="replace").strip("\x00")
-                                except Exception:
-                                    v = repr(v)
-                            result[name] = v
+                            result[name] = clean_json_value(v)
                     except Exception:
                         pass
             except Exception:

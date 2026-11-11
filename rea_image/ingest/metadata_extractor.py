@@ -4,7 +4,7 @@ import math
 from pathlib import Path
 from typing import Optional, Tuple
 from PIL import Image, ImageCms
-from rea_image.schemas import ImageMetadata
+from rea_image.schemas import ImageMetadata, format_rational
 from rea_image.ingest.hashing import compute_sha256, compute_phash
 
 
@@ -68,7 +68,13 @@ def extract_metadata(img: Image.Image, file_path: Path) -> ImageMetadata:
     dpi_raw = img.info.get("dpi")
     dpi: Optional[Tuple[float, float]] = None
     if dpi_raw and isinstance(dpi_raw, (tuple, list)) and len(dpi_raw) >= 2:
-        dpi = (float(dpi_raw[0]), float(dpi_raw[1]))
+        try:
+            d0 = format_rational(dpi_raw[0])
+            d1 = format_rational(dpi_raw[1])
+            if d0 is not None and d1 is not None and d0 > 0 and d1 > 0:
+                dpi = (float(d0), float(d1))
+        except Exception:
+            pass
         
     # Bit depth estimate
     mode = img.mode

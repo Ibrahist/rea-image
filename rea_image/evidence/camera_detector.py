@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 from PIL import ExifTags, Image
 from scipy.ndimage import laplace
+from rea_image.schemas import clean_json_value, format_rational
 
 logger = logging.getLogger(__name__)
 
@@ -77,27 +78,7 @@ def _clean_str(val: Any, max_len: int = 200) -> str:
     return s[:max_len]
 
 
-def _format_rational(val: Any) -> Optional[float]:
-    """Convert EXIF rational, tuple, or float to float."""
-    if val is None:
-        return None
-    try:
-        if isinstance(val, (int, float)):
-            return float(val)
-        if hasattr(val, "numerator") and hasattr(val, "denominator"):
-            return float(val.numerator) / float(val.denominator) if val.denominator != 0 else None
-        if isinstance(val, (tuple, list)) and len(val) >= 2:
-            num, den = val[0], val[1]
-            return float(num) / float(den) if den != 0 else None
-        # String representations like "1/250" or "2.8"
-        if isinstance(val, str):
-            if "/" in val:
-                n, d = val.split("/", 1)
-                return float(n) / float(d) if float(d) != 0 else None
-            return float(val)
-    except Exception:
-        pass
-    return None
+_format_rational = format_rational
 
 
 def _format_exposure_time(val: Any) -> Optional[str]:
@@ -428,7 +409,7 @@ class CameraDetector:
         def _add_tag(k: Any, v: Any):
             tag = ExifTags.TAGS.get(k, str(k))
             if tag not in PRIVACY_SENSITIVE_TAGS:
-                exif_dict[tag] = v
+                exif_dict[tag] = clean_json_value(v)
 
         # 1. Read EXIF from PIL Image instance
         if img is not None:

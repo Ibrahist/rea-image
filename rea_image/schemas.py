@@ -1,8 +1,100 @@
 """Data schemas and types for rea-image according to specification."""
 
+import math
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+
+
+def format_rational(val: Any) -> Optional[float]:
+    """Convert rational (IFDRational, Fraction, tuple, str, float) to float, handling zero denominators safely."""
+    if val is None:
+        return None
+    try:
+        if isinstance(val, (bool, str)):
+            if isinstance(val, str):
+                if "/" in val:
+                    n, d = val.split("/", 1)
+                    return float(n) / float(d) if float(d) != 0 else None
+                return float(val)
+            return None
+        if hasattr(val, "item") and not isinstance(val, (int, float)):
+            try:
+                val = val.item()
+            except Exception:
+                pass
+        if isinstance(val, (int, float)):
+            return float(val)
+        if hasattr(val, "numerator") and hasattr(val, "denominator"):
+            num = getattr(val, "numerator")
+            den = getattr(val, "denominator")
+            return float(num) / float(den) if den != 0 else None
+        if isinstance(val, (tuple, list)):
+            if len(val) == 1:
+                return format_rational(val[0])
+            if len(val) >= 2:
+                num = format_rational(val[0])
+                den = format_rational(val[1])
+                if num is not None and den is not None and den != 0:
+                    return num / den
+    except Exception:
+        pass
+    return None
+
+
+def clean_json_value(val: Any) -> Any:
+    """Recursively convert unknown objects (IFDRational, bytes, numpy scalars, etc.) to JSON-safe values."""
+    if val is None:
+        return None
+    if isinstance(val, (bool, str)):
+        return val
+    # Numpy scalars / arrays
+    if hasattr(val, "item") and not isinstance(val, (int, float, bool, str)):
+        try:
+            val = val.item()
+            if isinstance(val, (bool, str, int)):
+                return val
+            if isinstance(val, float):
+                if math.isnan(val) or math.isinf(val):
+                    return None
+                return val
+        except Exception:
+            pass
+    if hasattr(val, "tolist") and not isinstance(val, (list, tuple)):
+        try:
+            return clean_json_value(val.tolist())
+        except Exception:
+            pass
+    if isinstance(val, int):
+        return val
+    if isinstance(val, float):
+        if math.isnan(val) or math.isinf(val):
+            return None
+        return val
+    # IFDRational, Fraction, or any object with numerator/denominator
+    if hasattr(val, "numerator") and hasattr(val, "denominator"):
+        try:
+            num = getattr(val, "numerator")
+            den = getattr(val, "denominator")
+            if den == 0:
+                return None
+            return float(num) / float(den)
+        except Exception:
+            return None
+    # Bytes
+    if isinstance(val, bytes):
+        try:
+            return val.decode("utf-8", errors="replace").strip("\x00")
+        except Exception:
+            return repr(val)
+    # Sequences (tuples, sets, lists) -> list
+    if isinstance(val, (list, tuple, set)):
+        return [clean_json_value(x) for x in val]
+    # Mappings
+    if isinstance(val, dict):
+        return {str(k): clean_json_value(v) for k, v in val.items()}
+    # Fallback to string
+    return str(val)
 
 
 class ProductionMethod(str, Enum):
@@ -44,6 +136,15 @@ class EvidenceItem(BaseModel):
     direction: str = Field(..., description="Which method this evidence supports (or opposes)")
     strength: float = Field(..., ge=0.0, le=1.0, description="Confidence strength between 0.0 and 1.0")
     explanation: str = Field(..., description="Plain-language interpretation")
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def validate_value(cls, v: Any) -> Any:
+        return clean_json_value(v)
+
+    @field_serializer("value", mode="plain")
+    def serialize_value(self, v: Any) -> Any:
+        return clean_json_value(v)
 
 
 class MethodBreakdownItem(BaseModel):

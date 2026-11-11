@@ -792,3 +792,196 @@ def test_camera_cli_pure_pixel_ai_image():
     import json
     data = json.loads(res.output)
     assert "display_name" in data
+
+
+def test_full_rational_exif_jpeg_pipeline(tmp_path: Path):
+    """Test JPEG with full IFDRational EXIF succeeds across pipeline and CLI without serialization errors."""
+    import json
+    from PIL.TiffImagePlugin import IFDRational
+
+    img_path = tmp_path / "photo_rational.jpg"
+    img = Image.new("RGB", (300, 300), color=(110, 130, 150))
+
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Canon"
+    exif[ExifTags.Base.Model] = "Canon EOS R6"
+
+    exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+    exif_ifd[ExifTags.Base.ExposureTime] = IFDRational(1, 250)
+    exif_ifd[ExifTags.Base.FNumber] = IFDRational(28, 10)
+    exif_ifd[ExifTags.Base.FocalLength] = IFDRational(50, 1)
+    exif_ifd[ExifTags.Base.ISOSpeedRatings] = 400
+    exif_ifd[ExifTags.Base.LensModel] = "RF24-70mm F2.8 L IS USM"
+
+    img.save(img_path, "JPEG", exif=exif)
+
+    # 1. run_analysis_pipeline
+    out_dir = tmp_path / "pipeline_out"
+    report = run_analysis_pipeline(img_path, out_dir=out_dir, no_cache=True)
+    assert report is not None
+
+    report_json_path = out_dir / "report.json"
+    assert report_json_path.exists()
+    with open(report_json_path, "r", encoding="utf-8") as f:
+        json_content = f.read()
+        json_data = json.loads(json_content)
+
+    assert json_data["image"]["format"].lower() in ("jpeg", "jpg")
+    assert "Canon EOS R6" in json_content
+    assert "f/2.8" in json_content
+    assert "1/250s" in json_content
+
+    report_html_path = out_dir / "report.html"
+    assert report_html_path.exists()
+    html_content = report_html_path.read_text(encoding="utf-8")
+    assert "Canon EOS R6" in html_content
+    assert "f/2.8" in html_content
+    assert "1/250s" in html_content
+
+    # 2. rea-image analyze CLI
+    analyze_out = tmp_path / "analyze_cli_out"
+    res_analyze = runner.invoke(app, ["analyze", str(img_path), "--out", str(analyze_out)])
+    assert res_analyze.exit_code == 0
+
+    # 3. rea-image camera CLI
+    res_camera = runner.invoke(app, ["camera", str(img_path)])
+    assert res_camera.exit_code == 0
+    assert "EOS R6" in res_camera.output
+    assert "f/2.8" in res_camera.output
+    assert "1/250s" in res_camera.output
+
+    # 4. rea-image camera --json CLI
+    res_camera_json = runner.invoke(app, ["camera", str(img_path), "--json"])
+    assert res_camera_json.exit_code == 0
+    cam_json = json.loads(res_camera_json.output)
+    assert "EOS R6" in cam_json["display_name"]
+    assert cam_json["aperture"] == "f/2.8"
+    assert cam_json["shutter_speed"] == "1/250s"
+
+
+def test_apex_only_tags_pipeline(tmp_path: Path):
+    """Test JPEG with APEX tags only (ApertureValue, ShutterSpeedValue) succeeds and formats correctly."""
+    from PIL.TiffImagePlugin import IFDRational
+
+    img_path = tmp_path / "apex_photo.jpg"
+    img = Image.new("RGB", (200, 200), color=(100, 120, 140))
+
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Canon"
+    exif[ExifTags.Base.Model] = "EOS R6"
+
+    exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+    # Av = 3.0 -> f = 2^(1.5) = 2.828 -> f/2.8
+    exif_ifd[ExifTags.Base.ApertureValue] = IFDRational(30, 10)
+    # Tv = 7.965784 -> t = 2^(-7.965784) = 0.004 -> 1/250s
+    exif_ifd[ExifTags.Base.ShutterSpeedValue] = IFDRational(7965784, 1000000)
+    exif_ifd[ExifTags.Base.FocalLength] = IFDRational(50, 1)
+
+    img.save(img_path, "JPEG", exif=exif)
+
+    out_dir = tmp_path / "apex_out"
+    report = run_analysis_pipeline(img_path, out_dir=out_dir, no_cache=True)
+    assert report is not None
+
+    with open(out_dir / "report.json", "r", encoding="utf-8") as f:
+        json_content = f.read()
+    assert "f/2.8" in json_content
+    assert "1/250s" in json_content
+
+
+def test_camera_detection_png_with_rational_exif(tmp_path: Path):
+    """Test PNG containing rational EXIF succeeds across pipeline and camera CLI."""
+    import json
+    from PIL.TiffImagePlugin import IFDRational
+
+    img_path = tmp_path / "photo_rational.png"
+    img = Image.new("RGB", (200, 200), color=(80, 100, 120))
+
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Sony"
+    exif[ExifTags.Base.Model] = "ILCE-7M4"
+
+    exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+    exif_ifd[ExifTags.Base.ExposureTime] = IFDRational(1, 250)
+    exif_ifd[ExifTags.Base.FNumber] = IFDRational(28, 10)
+    exif_ifd[ExifTags.Base.FocalLength] = IFDRational(85, 1)
+
+    img.save(img_path, "PNG", exif=exif)
+
+    out_dir = tmp_path / "png_rational_out"
+    report = run_analysis_pipeline(img_path, out_dir=out_dir, no_cache=True)
+    assert report is not None
+
+    with open(out_dir / "report.json", "r", encoding="utf-8") as f:
+        json_content = f.read()
+    assert "Sony" in json_content
+    assert "ILCE-7M4" in json_content
+
+    res_json = runner.invoke(app, ["camera", str(img_path), "--json"])
+    assert res_json.exit_code == 0
+    cam_json = json.loads(res_json.output)
+    assert cam_json["make"] == "Sony"
+
+
+def test_malformed_exif_zero_denominator_and_bytes(tmp_path: Path):
+    """Test that malformed EXIF (zero denominators, byte blobs) does not crash pipeline or camera CLI."""
+    from PIL.TiffImagePlugin import IFDRational
+
+    img_path = tmp_path / "malformed_exif.jpg"
+    img = Image.new("RGB", (200, 200), color=(90, 110, 130))
+
+    exif = img.getexif()
+    exif[ExifTags.Base.Make] = "Nikon"
+    exif[ExifTags.Base.Model] = "Z 6"
+
+    exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+    exif_ifd[ExifTags.Base.FNumber] = IFDRational(28, 0)
+    exif_ifd[ExifTags.Base.ExposureTime] = IFDRational(1, 0)
+    exif_ifd[ExifTags.Base.FocalLength] = b"\x00\x01\x02\xff"
+
+    img.save(img_path, "JPEG", exif=exif)
+
+    out_dir = tmp_path / "malformed_out"
+    report = run_analysis_pipeline(img_path, out_dir=out_dir, no_cache=True)
+    assert report is not None
+    assert (out_dir / "report.json").exists()
+
+    res = runner.invoke(app, ["camera", str(img_path)])
+    assert res.exit_code == 0
+
+    res_json = runner.invoke(app, ["camera", str(img_path), "--json"])
+    assert res_json.exit_code == 0
+
+
+def test_evidence_item_safe_by_default():
+    """Test EvidenceItem pydantic validator and serializer convert unknown objects safely."""
+    from PIL.TiffImagePlugin import IFDRational
+    from rea_image.schemas import EvidenceItem
+
+    item = EvidenceItem(
+        name="test_signal",
+        value={
+            "rat": IFDRational(1, 250),
+            "bad_rat": IFDRational(5, 0),
+            "bytes": b"clean_bytes\x00",
+            "np_scalar": np.float64(2.8),
+            "np_int": np.int32(100),
+            "tuple_rat": (IFDRational(50, 1), 10),
+        },
+        direction="real photograph",
+        strength=0.9,
+        explanation="Testing safe serialization",
+    )
+
+    dumped = item.model_dump(mode="json")
+    assert dumped["value"]["rat"] == 0.004
+    assert dumped["value"]["bad_rat"] is None
+    assert dumped["value"]["bytes"] == "clean_bytes"
+    assert dumped["value"]["np_scalar"] == 2.8
+    assert dumped["value"]["np_int"] == 100
+    assert dumped["value"]["tuple_rat"] == [50.0, 10]
+
+    # Test direct mutation
+    item.value = {"mutated_rat": IFDRational(1, 1000)}
+    dumped2 = item.model_dump(mode="json")
+    assert dumped2["value"]["mutated_rat"] == 0.001
